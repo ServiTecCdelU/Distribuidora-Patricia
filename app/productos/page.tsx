@@ -151,6 +151,7 @@ export default function ProductosPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const [remitoImportOpen, setRemitoImportOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("catalogo");
 
   // Estados para historiales
   const [stockHistory, setStockHistory] = useState<StockMovement[]>([]);
@@ -852,7 +853,7 @@ export default function ProductosPage() {
 
   return (
     <MainLayout title="Productos" description="Gestiona tu catálogo de productos">
-      <Tabs defaultValue="catalogo">
+      <Tabs defaultValue="catalogo" onValueChange={(v) => setActiveTab(v)}>
         <TabsList className="mb-4 rounded-xl">
           <TabsTrigger value="catalogo" className="rounded-lg">Catálogo</TabsTrigger>
           <TabsTrigger value="recepcion" className="rounded-lg">Recepción de mercadería</TabsTrigger>
@@ -1738,7 +1739,7 @@ export default function ProductosPage() {
 
         </TabsContent>
         <TabsContent value="recepcion" className="mt-2">
-          <RecepcionMercaderia />
+          {activeTab === "recepcion" && <RecepcionMercaderia />}
         </TabsContent>
       </Tabs>
 
