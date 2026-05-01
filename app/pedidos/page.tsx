@@ -10,7 +10,10 @@ import { Input } from "@/components/ui/input";
 import { ClientModal } from "@/components/clientes/client-modal";
 import { ordersApi, salesApi, clientsApi, paymentsApi, sellersApi } from "@/lib/api";
 import type { Order, OrderStatus, Client, Seller } from "@/lib/types";
-import { Package, Search, Calendar, User, Filter, X, Loader2, Navigation, ClipboardList } from "lucide-react";
+import { Package, Search, Calendar, User, Filter, X, Loader2, Navigation, ClipboardList, Store } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { VentasMayoristaTab } from "@/components/pedidos/VentasMayoristaTab";
+import { PedidoMayoristaTab } from "@/components/pedidos/PedidoMayoristaTab";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -778,6 +781,28 @@ export default function PedidosPage() {
 
   return (
     <MainLayout title="Pedidos" description="Seguimiento de pedidos y entregas">
+      <Tabs defaultValue="entregas" className="space-y-4">
+        <TabsList className="rounded-xl">
+          <TabsTrigger value="entregas" className="rounded-lg gap-1.5">
+            <ClipboardList className="h-4 w-4" /> Entregas
+          </TabsTrigger>
+          <TabsTrigger value="ventas" className="rounded-lg gap-1.5">
+            <Package className="h-4 w-4" /> Ventas
+          </TabsTrigger>
+          <TabsTrigger value="mayorista" className="rounded-lg gap-1.5">
+            <Store className="h-4 w-4" /> Pedido al mayorista
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ventas" className="mt-0">
+          <VentasMayoristaTab />
+        </TabsContent>
+
+        <TabsContent value="mayorista" className="mt-0">
+          <PedidoMayoristaTab />
+        </TabsContent>
+
+        <TabsContent value="entregas" className="mt-0">
       <div className="mb-6 space-y-4">
         <div className="flex flex-col lg:flex-row gap-3 justify-between items-start lg:items-center">
           <div className="flex items-center gap-2 w-full lg:w-auto">
@@ -1052,6 +1077,8 @@ export default function PedidosPage() {
         orders={filteredOrders}
       />
 
+        </TabsContent>
+      </Tabs>
     </MainLayout>
   );
 }
