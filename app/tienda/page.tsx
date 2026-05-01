@@ -37,7 +37,7 @@ import {
   Plus,
   Minus,
   Search,
-  IceCream,
+  Store,
   CheckCircle,
   ArrowLeft,
   ChevronDown,
@@ -101,7 +101,7 @@ function LogoImage() {
       {!loaded && <div className="absolute inset-0 animate-pulse bg-primary/20 rounded-full" />}
       <Image
         src="/logo.png"
-        alt="Helados Mio"
+        alt="Distribuidora Patricia"
         fill
         priority
         className={`object-contain transition-opacity duration-200 ${loaded ? "opacity-100" : "opacity-0"}`}
@@ -338,7 +338,7 @@ export function StoreFront({
         />
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <div className="flex flex-col items-center gap-4">
-            <IceCream className="h-12 w-12 text-primary animate-bounce" />
+            <Store className="h-12 w-12 text-primary animate-bounce" />
             <p className="text-muted-foreground">Cargando productos...</p>
           </div>
         </div>
@@ -384,7 +384,7 @@ export function StoreFront({
                     <LogoImage />
                     <div>
                       <h1 className="text-base sm:text-xl font-bold text-foreground leading-tight">
-                        Helados Mio
+                        Distribuidora Patricia
                       </h1>
                       <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
                         Tienda Online
@@ -544,7 +544,7 @@ export function StoreFront({
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Buscar helados..."
+                    placeholder="Buscar productos..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-10 h-9 sm:h-10 rounded-full bg-muted/50 focus-visible:bg-background transition-colors text-sm"
@@ -928,7 +928,7 @@ export function StoreFront({
         >
           <div className="mb-6 sm:mb-8 rounded-2xl border border-border/50 bg-gradient-to-r from-primary/10 via-background to-primary/5 p-4 sm:p-6">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground text-center">
-              Nuestros Helados
+              Nuestros Productos
             </h2>
             <p className="text-sm text-muted-foreground mt-1 text-center">
               {filteredProducts.length} productos disponibles

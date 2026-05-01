@@ -6,24 +6,24 @@ import Image from "next/image";
 
 const SLIDES = [
   {
-    id: "cool-fruit",
-    title: "Cool Fruit",
-    subtitle: "Frescura y sabor natural en cada bocado",
-    image: "https://www.miohelados.com.ar/modules/highlighted/images/big/imagenes/slide/2025_10 MIO--Slider--Cool-Fruit.jpg",
+    id: "productos",
+    title: "Productos de Calidad",
+    subtitle: "Los mejores alimentos para tu negocio",
+    image: "/fondo.jpg",
     fallback: "/fondo.jpg",
   },
   {
-    id: "sin-gluten",
-    title: "Copas Stop Sin Gluten",
-    subtitle: "Opciones sin TACC para disfrutar sin preocupaciones",
-    image: "https://www.miohelados.com.ar/modules/highlighted/images/big/imagenes/slide/2025_10-MIO--Slider--Copas-Stop-Sin-Gluten.jpg",
+    id: "variedad",
+    title: "Gran Variedad",
+    subtitle: "Amplio catálogo de productos alimenticios",
+    image: "/fondo.png",
     fallback: "/fondo.png",
   },
   {
-    id: "multipacks",
-    title: "Multipacks",
-    subtitle: "Variedad para compartir con toda la familia",
-    image: "https://www.miohelados.com.ar/modules/highlighted/images/big/imagenes/slide/2025_10-MIO--Slider--Multipacks.jpg",
+    id: "distribucion",
+    title: "Distribución Confiable",
+    subtitle: "Entrega a tiempo en toda la zona de cobertura",
+    image: "/fondocel.jpg",
     fallback: "/fondocel.jpg",
   },
 ];
@@ -80,7 +80,7 @@ export function HeroCarousel() {
                   {!logoLoaded && <div className="absolute inset-0 animate-pulse rounded-full bg-white/20" />}
                   <Image
                     src="/logo.png"
-                    alt="Helados Mio"
+                    alt="Distribuidora Patricia"
                     fill
                     priority
                     className={`object-contain animate-float transition-opacity duration-300 ${logoLoaded ? "opacity-100" : "opacity-0"}`}

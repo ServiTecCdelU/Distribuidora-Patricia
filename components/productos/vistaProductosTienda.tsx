@@ -8,7 +8,7 @@ import {
   Search,
   Plus,
   Minus,
-  IceCream,
+  Store,
   Filter,
   ChevronDown,
   Star,
@@ -167,7 +167,7 @@ export function VistaProductosTienda({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar helados por nombre, categoría o descripción..."
+              placeholder="Buscar productos por nombre, categoría o descripción..."
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10 pr-10"
@@ -577,7 +577,7 @@ export function VistaProductosTienda({
       {sortedProducts.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
           <div className="relative">
-            <IceCream className="h-20 w-20 text-muted-foreground" />
+            <Store className="h-20 w-20 text-muted-foreground" />
             <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/10 blur-xl rounded-full" />
           </div>
           <div className="space-y-2">

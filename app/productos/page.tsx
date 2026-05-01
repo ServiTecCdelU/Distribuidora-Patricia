@@ -67,15 +67,15 @@ type MarcaFilter =
 type StockFilter = "all" | "available" | "low" | "out";
 type CategoryFilter =
   | "all"
-  | "Helado individual"
-  | "Helado a granel"
-  | "Torta helada"
   | "Congelado embutido"
   | "Congelado cárnico"
   | "Congelado papa"
   | "Congelado verdura"
   | "Congelado rebozado"
-  | "Bebida";
+  | "Bebida"
+  | "Lácteo"
+  | "Conserva"
+  | "Snack";
 type SinTaccFilter = "all" | "sin-tacc" | "con-tacc";
 type ViewMode = "grid" | "list";
 
@@ -849,7 +849,7 @@ export default function ProductosPage() {
   );
 
   return (
-    <MainLayout title="Productos" description="Gestiona tu catálogo de helados">
+    <MainLayout title="Productos" description="Gestiona tu catálogo de productos">
       {/* Header */}
       <div className="mb-4 sm:mb-6">
         <PageHeader

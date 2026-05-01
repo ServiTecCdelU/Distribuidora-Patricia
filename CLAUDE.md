@@ -3,18 +3,10 @@
 Este archivo guia a Claude Code cuando trabaja con este repositorio. **Siempre responder en español.**
 
 CONTEXTO DEL PROYECTO
-Este es un proyecto existente de gestión (productos, pedidos, etc.) para una distribuidora de helados de la marca Mío Helados.
-REGLA CRÍTICA: NO toques, modifiques ni refactorices nada del sistema de gestión existente (ABM de productos, pedidos, dashboard, login, etc.). Solo agregá las nuevas secciones públicas.
-Lo que necesito:
-Agregar un frontend público (landing page / home) espectacular que sea la cara visible para los clientes. La parte de gestión interna (admin, productos, pedidos) ya existe y debe seguir funcionando exactamente igual.
-Proveedor: Mío Helados
+Este es un sistema de gestión (productos, pedidos, etc.) para Distribuidora Patricia, una distribuidora de alimentos.
+El sistema es interno (requiere login). No hay sección pública.
 
-Web: https://www.miohelados.com.ar/
-Se pueden usar su logo, imágenes de productos y banners directamente
-
-NOMBRE DE LA DISTRIBUIDORA: [REEMPLAZÁ CON TU NOMBRE]
-ZONA DE COBERTURA: [REEMPLAZÁ CON TU ZONA]
-WHATSAPP: [REEMPLAZÁ CON TU NÚMERO con código de país, ej: 5493411234567]
+NOMBRE DE LA DISTRIBUIDORA: Distribuidora Patricia
 ## Commands
 
 ```bash

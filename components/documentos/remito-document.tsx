@@ -56,14 +56,14 @@ export const RemitoDocument = forwardRef<HTMLDivElement, RemitoDocumentProps>(
               <div className="h-16 w-16 bg-white rounded-xl shadow-lg flex items-center justify-center overflow-hidden">
                 <Image 
                   src="/logo.png" 
-                  alt="Helados Mio" 
+                  alt="Distribuidora Patricia"
                   width={64} 
                   height={64}
                   className="object-contain"
                 />
               </div>
               <div className="text-white">
-                <h1 className="text-3xl font-bold tracking-tight">Helados Mío</h1>
+                <h1 className="text-3xl font-bold tracking-tight">Distribuidora Patricia</h1>
                 <p className="text-cyan-100 text-sm font-medium mt-1">Distribuidora</p>
               </div>
             </div>
@@ -186,7 +186,7 @@ export const RemitoDocument = forwardRef<HTMLDivElement, RemitoDocumentProps>(
           <div className="text-center">
             <div className="h-20 border-b-2 border-gray-300 mb-3" />
             <p className="font-semibold text-gray-700">Firma del Remitente</p>
-            <p className="text-xs text-gray-500 mt-1">Helados Mío</p>
+            <p className="text-xs text-gray-500 mt-1">Distribuidora Patricia</p>
           </div>
           <div className="text-center">
             <div className="h-20 border-b-2 border-gray-300 mb-3" />

@@ -28,15 +28,15 @@ import { Loader2, Upload, ImageIcon, X, Plus, PackagePlus } from "lucide-react";
 const DEFAULT_IMAGE = "/logo.png";
 
 const DEFAULT_CATEGORIES = [
-  "Helado individual",
-  "Helado a granel",
-  "Torta helada",
   "Congelado embutido",
   "Congelado cárnico",
   "Congelado papa",
   "Congelado verdura",
   "Congelado rebozado",
   "Bebida",
+  "Lácteo",
+  "Conserva",
+  "Snack",
 ];
 
 const DEFAULT_MARCAS = [
@@ -239,7 +239,7 @@ export function ProductModal({
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                placeholder="Ej: Helado de Chocolate Suizo"
+                placeholder="Ej: Milanesa de Pollo"
                 className="h-10"
                 autoFocus
               />

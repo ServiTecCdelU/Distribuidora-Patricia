@@ -25,7 +25,7 @@ export default function HomePage() {
         router.push('/ventas/nueva')
       }
     } else {
-      router.push('/tienda')
+      router.push('/login')
     }
   }, [loading, user, router])
 

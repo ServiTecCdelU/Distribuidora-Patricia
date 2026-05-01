@@ -148,7 +148,7 @@ export function ClientModal({ open, onOpenChange, client, onSave, showCreditLimi
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ej: Helados Mio S.A."
+                placeholder="Ej: Distribuidora Patricia S.A."
                 className={errors.name ? 'border-destructive' : ''}
               />
               {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}

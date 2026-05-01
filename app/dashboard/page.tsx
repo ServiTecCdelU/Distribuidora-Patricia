@@ -27,7 +27,7 @@ import {
   Calendar, 
   CreditCard, 
   DollarSign, 
-  IceCream as Helado, 
+  Store as Helado,
   Package as Paquete, 
   Search as Buscar, 
   ShoppingCart as CarritoDeCompras, 
@@ -1134,7 +1134,7 @@ export default function DashboardPage() {
               <Label htmlFor="alias">Alias</Label>
               <Input
                 id="alias"
-                placeholder="ej: helados.mio.mp"
+                placeholder="ej: distribuidora.patricia.mp"
                 value={aliasConfig.alias}
                 onChange={(e) => setAliasConfig(prev => ({ ...prev, alias: e.target.value }))}
               />

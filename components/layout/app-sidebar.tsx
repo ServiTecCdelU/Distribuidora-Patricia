@@ -70,7 +70,7 @@ export function AppSidebar() {
             {!logoLoaded && <div className="absolute inset-0 animate-pulse rounded-lg bg-sidebar-accent" />}
             <Image
               src="/logo.png"
-              alt="Helados Mio"
+              alt="Distribuidora Patricia"
               width={32}
               height={32}
               priority
@@ -78,7 +78,7 @@ export function AppSidebar() {
               onLoad={() => setLogoLoaded(true)}
             />
           </div>
-          <span className="font-bold text-sidebar-foreground">Helados Mio</span>
+          <span className="font-bold text-sidebar-foreground">Distribuidora Patricia</span>
         </div>
         <Button
           variant="ghost"
@@ -112,7 +112,7 @@ export function AppSidebar() {
               {!logoLoaded && <div className="absolute inset-0 animate-pulse bg-sidebar-accent" />}
               <Image
                 src="/logo.png"
-                alt="Helados Mio"
+                alt="Distribuidora Patricia"
                 width={40}
                 height={40}
                 priority
@@ -122,7 +122,7 @@ export function AppSidebar() {
             </div>
             <div className="min-w-0">
               <h1 className="font-semibold text-base text-sidebar-foreground truncate">
-                Helados Mio
+                Distribuidora Patricia
               </h1>
               <p className="text-xs text-sidebar-foreground/60">
                 Distribuidora

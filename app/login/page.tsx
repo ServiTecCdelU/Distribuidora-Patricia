@@ -6,13 +6,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { IceCream, Loader2 } from 'lucide-react'
+import { Store, Loader2 } from 'lucide-react'
 import { signInWithGoogle } from '@/services/auth-service'
 import { useAuth } from '@/hooks/use-auth'
 import type { User } from '@/lib/types'
 
 function getHomeRoute(user: User): string {
-  if (user.role === 'customer') return '/'
   if (user.role === 'seller') {
     if (user.employeeType === 'transportista') return '/pedidos'
     return '/ventas/nueva'
@@ -51,10 +50,10 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary">
-              <IceCream className="h-8 w-8 text-primary-foreground" />
+              <Store className="h-8 w-8 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl sm:text-3xl">Helados Mio</CardTitle>
+          <CardTitle className="text-2xl sm:text-3xl">Distribuidora Patricia</CardTitle>
           <CardDescription>Ingrese sus credenciales para acceder al sistema</CardDescription>
         </CardHeader>
         <CardContent>
