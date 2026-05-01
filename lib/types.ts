@@ -190,6 +190,41 @@ export interface PriceList {
   createdAt: Date;
 }
 
+export interface MayoristaProducto {
+  id: string;
+  codigo: string;
+  nombre: string;
+  precioUnitarioMayorista: number;
+  unidadesPorBulto: number;
+  categoria: string;
+  precioVenta: number;
+  gananciaGlobal?: number;
+  stockLocal: number;
+  updatedAt: Date;
+}
+
+export interface StockMovimiento {
+  id: string;
+  productoId: string;
+  tipo: "apertura_bulto" | "venta" | "ajuste";
+  cantidad: number;
+  referencia?: string;
+  fecha: Date;
+}
+
+export interface PedidoMayorista {
+  id: string;
+  fecha: Date;
+  estado: "borrador" | "enviado" | "recibido_parcial" | "cerrado";
+  productos: {
+    productoId: string;
+    nombre: string;
+    unidadesPedidas: number;
+    unidadesRecibidas: number;
+    bultosPedidos: number;
+  }[];
+}
+
 export interface SellerCommission {
   id: string;
   sellerId: string;
