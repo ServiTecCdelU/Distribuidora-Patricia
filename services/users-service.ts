@@ -89,8 +89,15 @@ export const ensureUserProfile = async (data: {
 
   const docId = await generateReadableId(firestore, USERS_COLLECTION, 'usuario', data.name)
 
-  // Si el email coincide con un vendedor/empleado, asignar rol 'seller' automáticamente
-  const autoRole: UserRole = matchingSeller ? 'seller' : (data.role ?? 'customer')
+  // Si no hay ningún admin, el primer usuario se convierte en admin
+  let autoRole: UserRole = matchingSeller ? 'seller' : (data.role ?? 'customer')
+  if (!matchingSeller && autoRole !== 'admin') {
+    const adminsQuery = query(collection(firestore, USERS_COLLECTION), where('role', '==', 'admin'))
+    const adminsSnapshot = await getDocs(adminsQuery)
+    if (adminsSnapshot.empty) {
+      autoRole = 'admin'
+    }
+  }
 
   const profile: User = {
     id: docId,
