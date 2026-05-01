@@ -202,6 +202,10 @@ export function UnifiedCart({ role, state, actions, onConfirmSale, allowDiscount
       {(role === null || cartStep === "products") && (
       <div className="flex-1 overflow-y-auto space-y-2 pb-3 max-h-[40vh] sm:max-h-[280px]">
         {cart.map((item) => {
+          const esMayorista = item.product.stockLocal !== undefined;
+          const stockLocal = item.product.stockLocal ?? 0;
+          const cantidadStockLocal = Math.min(item.quantity, stockLocal);
+          const cantidadPendiente = Math.max(0, item.quantity - stockLocal);
           const remaining = item.product.stock - item.quantity;
           return (
             <div
@@ -256,15 +260,28 @@ export function UnifiedCart({ role, state, actions, onConfirmSale, allowDiscount
                       size="icon"
                       className="h-8 w-8 sm:h-9 sm:w-9 rounded-md hover:bg-background"
                       onClick={() => actions.updateQuantity(item.product.id, 1)}
-                      disabled={item.quantity >= item.product.stock}
+                      disabled={!esMayorista && item.quantity >= item.product.stock}
                     >
                       <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     </Button>
                   </div>
                   <div className="flex-1 flex items-center justify-between gap-1">
-                    <span className={cn("text-[11px] sm:text-xs font-medium", remaining > 15 ? "text-emerald-600" : "text-destructive")}>
-                      Stock: {remaining}
-                    </span>
+                    {esMayorista ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className={cn("text-[10px] font-medium", cantidadStockLocal > 0 ? "text-emerald-600" : "text-muted-foreground")}>
+                          Local: {cantidadStockLocal}/{item.quantity}
+                        </span>
+                        {cantidadPendiente > 0 && (
+                          <span className="text-[10px] font-medium text-amber-600">
+                            Mayorista: {cantidadPendiente}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className={cn("text-[11px] sm:text-xs font-medium", remaining > 15 ? "text-emerald-600" : "text-destructive")}>
+                        Stock: {remaining}
+                      </span>
+                    )}
                     <div className="text-right">
                       {item.itemDiscount ? (
                         <>

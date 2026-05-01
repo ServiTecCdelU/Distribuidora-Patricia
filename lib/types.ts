@@ -24,6 +24,10 @@ export interface Product {
   imageUrl: string;
   category: string;
   createdAt: Date;
+  // Campos mayorista (solo cuando el producto viene de mayorista_productos)
+  stockLocal?: number;
+  unidadesPorBulto?: number;
+  codigo?: string;
 }
 
 export interface Client {
@@ -60,6 +64,8 @@ export interface CartItem {
   product: Product;
   quantity: number;
   itemDiscount?: number; // porcentaje 0-30
+  cantidadStockLocal?: number;
+  cantidadPendienteMayorista?: number;
 }
 
 export interface Sale {
@@ -82,7 +88,7 @@ export interface Sale {
   paymentMethod?: "efectivo" | "transferencia";
   cashAmount?: number;
   creditAmount?: number;
-  status: "completed" | "pending";
+  status: "completed" | "pending" | "listo" | "pendiente";
   invoiceNumber?: string;
   remitoNumber?: string;
   invoiceEmitted: boolean;

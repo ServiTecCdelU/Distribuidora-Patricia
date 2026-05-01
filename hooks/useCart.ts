@@ -2,7 +2,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { productsApi, clientsApi, salesApi, sellersApi, ordersApi } from "@/lib/api";
+import { clientsApi, sellersApi, ordersApi } from "@/lib/api";
+import { getMayoristaProductos } from "@/services/mayorista-service";
+import { processSaleMayorista } from "@/services/sales-service";
 import type { Product, Client, CartItem, Seller, City } from "@/lib/types";
 import { toast } from "sonner";
 import { formatCurrency, normalizeCuit } from "@/lib/utils/format";
@@ -132,7 +134,7 @@ export interface CartActions {
 
   // Actions
   canProcessSale: () => boolean;
-  processSale: () => Promise<void>;
+  processSale: (modo?: "esperar" | "disponible") => Promise<"order" | "sale" | null>;
   resetCart: () => void;
   formatCurrency: (amount: number) => string;
 
@@ -271,12 +273,26 @@ export function useCart(role: UserRole, userEmail?: string) {
         setClients([]);
         setSellers([]);
       } else {
-        // Admin/seller: load everything
-        const [productsData, clientsData, sellersData] = await Promise.all([
-          productsApi.getAll(),
+        // Admin/seller: cargar desde mayorista_productos
+        const [mayoristaData, clientsData, sellersData] = await Promise.all([
+          getMayoristaProductos(),
           clientsApi.getAll(),
           sellersApi.getAll(),
         ]);
+        // Convertir MayoristaProducto a Product (stock=9999 para no restringir pedidos)
+        const productsData = mayoristaData.map((p) => ({
+          id: p.id,
+          name: p.nombre,
+          description: p.codigo,
+          price: p.precioVenta,
+          stock: 9999,
+          stockLocal: p.stockLocal,
+          unidadesPorBulto: p.unidadesPorBulto,
+          codigo: p.codigo,
+          imageUrl: "",
+          category: p.categoria,
+          createdAt: p.updatedAt,
+        }));
         setProducts(productsData);
         setClients(clientsData);
         setSellers(sellersData.filter((s) => s.isActive));
@@ -645,7 +661,7 @@ export function useCart(role: UserRole, userEmail?: string) {
   ]);
 
   // --- Process sale ---
-  const handleProcessSale = useCallback(async () => {
+  const handleProcessSale = useCallback(async (modo: "esperar" | "disponible" = "disponible") => {
     setProcessing(true);
     try {
       const resolvedAddress =
@@ -757,7 +773,7 @@ export function useCart(role: UserRole, userEmail?: string) {
           paymentType === "cash" && cashAmount > finalTotal
             ? cashAmount - finalTotal
             : 0;
-        const sale = await salesApi.processSale({
+        const sale = await processSaleMayorista({
           clientId: resolvedClientId,
           clientName: resolvedClientName,
           clientPhone: resolvedClientPhone,
@@ -777,25 +793,26 @@ export function useCart(role: UserRole, userEmail?: string) {
           overpayment: overpayment > 0 ? overpayment : undefined,
           discount: discountValue > 0 ? discountValue : undefined,
           discountType: discountValue > 0 ? discountType : undefined,
-          source: "direct",
-          createOrder: false,
           deliveryMethod: "pickup",
           deliveryAddress: "Retiro en local",
+          modo,
         });
 
         setLastSaleId(sale.id);
         setSaleComplete(true);
-        toast.success("Venta procesada correctamente");
+        const msg = modo === "esperar"
+          ? "Venta creada — pendiente de stock mayorista"
+          : "Venta confirmada con stock disponible";
+        toast.success(msg);
 
-        // Low stock alerts
-        const STOCK_MIN = 5;
-        cart
-          .filter((item) => item.product.stock - item.quantity <= STOCK_MIN)
-          .forEach((item) => {
-            toast.warning(
-              `Stock bajo: ${item.product.name} - quedan ${item.product.stock - item.quantity} unidades`,
-            );
-          });
+        // Alerta de stock bajo
+        cart.forEach((item) => {
+          const localStock = item.product.stockLocal ?? 0;
+          const restante = localStock - item.quantity;
+          if (restante <= 3 && restante >= 0) {
+            toast.warning(`Stock bajo: ${item.product.name} — quedan ${restante} unidades locales`);
+          }
+        });
 
         return "sale";
       }
@@ -912,7 +929,7 @@ export function useCart(role: UserRole, userEmail?: string) {
     selectSavedAddress, updateClientAddress, deleteClientAddress,
     setDeliveryCoords: (lat: number | null, lng: number | null) => { setDeliveryLat(lat); setDeliveryLng(lng); },
     setDiscountType, setDiscountValue, setDiscountOpen,
-    canProcessSale, processSale: handleProcessSale, resetCart, formatCurrency,
+    canProcessSale, processSale: (modo?: "esperar" | "disponible") => handleProcessSale(modo ?? "disponible"), resetCart, formatCurrency,
     createNewClient, registerClientFromDni, registerClientFromModal, setClientCreditLimit,
   };
 

@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +17,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Warehouse, Clock, CheckCircle2 } from "lucide-react";
 import {
   Search,
   Plus,
@@ -91,7 +91,7 @@ function NuevaVentaContent({
   const [showDisabled, setShowDisabled] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [cartDialogOpen, setCartDialogOpen] = useState(false);
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [mayoristaDialogOpen, setMayoristaDialogOpen] = useState(false);
 
   // Abrir carrito automáticamente si viene desde tienda (?openCart=true)
   useEffect(() => {
@@ -121,9 +121,9 @@ function NuevaVentaContent({
 
   const filteredProducts = enabledProducts.length + disabledProducts.length > 0;
 
-  const handleConfirmSale = async () => {
-    const result = await actions.processSale();
-    setConfirmDialogOpen(false);
+  const handleConfirmSale = async (modo: "esperar" | "disponible") => {
+    setMayoristaDialogOpen(false);
+    const result = await actions.processSale(modo);
     if (result === "order") {
       // Transportistas y "ambos" tienen acceso a pedidos; vendedores puros no
       const canSeePedidos = employeeType === "transportista" || employeeType === "ambos";
@@ -350,39 +350,127 @@ function NuevaVentaContent({
               role={cartRole}
               state={state}
               actions={actions}
-              onConfirmSale={() => { setCartDialogOpen(false); setConfirmDialogOpen(true); }}
+              onConfirmSale={() => { setCartDialogOpen(false); setMayoristaDialogOpen(true); }}
             />
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Dialog */}
-      <ConfirmDialog
-        open={confirmDialogOpen}
-        onOpenChange={setConfirmDialogOpen}
-        title={state.deliveryMethod === "delivery" ? "Confirmar Pedido" : "Confirmar Venta"}
-        description={
-          state.deliveryMethod === "delivery"
-            ? `Crear pedido por ${actions.formatCurrency(state.finalTotal)} para envio a domicilio?`
-            : `Procesar venta por ${actions.formatCurrency(state.finalTotal)}${
-                state.paymentType === "cash"
-                  ? state.cashAmount > state.finalTotal
-                    ? ` en efectivo (paga ${actions.formatCurrency(state.cashAmount)}, queda a favor ${actions.formatCurrency(state.cashAmount - state.finalTotal)})`
-                    : " en efectivo"
-                  : state.paymentType === "credit" ? ` a cuenta de ${state.selectedClientData?.name || "cliente"}`
-                  : ` (${actions.formatCurrency(state.cashAmount)} efectivo + ${actions.formatCurrency(state.creditAmountInput)} a cuenta)`
-              }${state.sellerMatchName ? ` - Vendedor: ${state.sellerMatchName}` : state.selectedSellerData ? ` - Vendedor: ${state.selectedSellerData.name}` : ""}?`
-        }
-        confirmText={state.processing ? "Procesando..." : state.deliveryMethod === "delivery" ? "Crear Pedido" : "Confirmar"}
-        confirmDisabled={state.processing}
+      {/* Dialog de opciones mayorista */}
+      <MayoristaOptionsDialog
+        open={mayoristaDialogOpen}
+        onOpenChange={setMayoristaDialogOpen}
+        cart={state.cart}
+        total={state.finalTotal}
+        formatCurrency={actions.formatCurrency}
+        processing={state.processing}
         onConfirm={handleConfirmSale}
       />
     </MainLayout>
   );
 }
 
-// ─── Sub-componentes de productos ─────────────────────────────────────────────
+// ─── Dialog de opciones mayorista ────────────────────────────────────────────
 import type { Product, CartItem } from "@/lib/types";
+
+function MayoristaOptionsDialog({
+  open, onOpenChange, cart, total, formatCurrency, processing, onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  cart: CartItem[];
+  total: number;
+  formatCurrency: (n: number) => string;
+  processing: boolean;
+  onConfirm: (modo: "esperar" | "disponible") => void;
+}) {
+  const hayPendiente = cart.some((item) => {
+    const stockLocal = item.product.stockLocal ?? 0;
+    return item.quantity > stockLocal;
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Warehouse className="h-5 w-5 text-teal-600" />
+            Confirmar venta
+          </DialogTitle>
+          <DialogDescription className="sr-only">Elegí cómo procesar esta venta</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {/* Resumen de ítems */}
+          <div className="rounded-xl border divide-y text-sm">
+            {cart.map((item) => {
+              const stockLocal = item.product.stockLocal ?? 0;
+              const local = Math.min(item.quantity, stockLocal);
+              const pendiente = Math.max(0, item.quantity - stockLocal);
+              return (
+                <div key={item.product.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                  <span className="flex-1 truncate font-medium text-xs">{item.product.name}</span>
+                  <div className="flex items-center gap-2 text-xs shrink-0">
+                    <span className="text-emerald-600">local: {local}</span>
+                    {pendiente > 0 && (
+                      <span className="text-amber-600">mayorista: {pendiente}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-between items-center px-1 text-sm font-semibold">
+            <span className="text-muted-foreground">Total</span>
+            <span className="text-lg text-teal-600">{formatCurrency(total)}</span>
+          </div>
+
+          {/* Opciones */}
+          {hayPendiente ? (
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                onClick={() => onConfirm("esperar")}
+                disabled={processing}
+                className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-amber-300 bg-amber-50/50 hover:bg-amber-50 transition-colors disabled:opacity-50 text-left"
+              >
+                <Clock className="h-6 w-6 text-amber-600" />
+                <div>
+                  <p className="font-semibold text-sm text-amber-800">Esperar todo</p>
+                  <p className="text-xs text-amber-700/70 mt-0.5">Queda pendiente hasta que llegue el stock</p>
+                </div>
+              </button>
+              <button
+                onClick={() => onConfirm("disponible")}
+                disabled={processing}
+                className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-teal-300 bg-teal-50/50 hover:bg-teal-50 transition-colors disabled:opacity-50 text-left"
+              >
+                <CheckCircle2 className="h-6 w-6 text-teal-600" />
+                <div>
+                  <p className="font-semibold text-sm text-teal-800">Vender con lo que hay</p>
+                  <p className="text-xs text-teal-700/70 mt-0.5">Confirma con stock local, el resto se cancela</p>
+                </div>
+              </button>
+            </div>
+          ) : (
+            <div className="pt-1">
+              <button
+                onClick={() => onConfirm("disponible")}
+                disabled={processing}
+                className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl border-2 border-teal-300 bg-teal-50/50 hover:bg-teal-50 transition-colors disabled:opacity-50 font-semibold text-teal-800"
+              >
+                <CheckCircle2 className="h-5 w-5 text-teal-600" />
+                {processing ? "Procesando..." : "Confirmar venta"}
+              </button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Sub-componentes de productos ─────────────────────────────────────────────
 
 const LOGO_FALLBACK = "/logo.png";
 
@@ -401,15 +489,16 @@ const ProductCard = memo(function ProductCard({
   formatCurrency: (n: number) => string;
   disabled?: boolean;
 }) {
+  const esMayorista = product.stockLocal !== undefined;
+  const stockDisplay = esMayorista ? (product.stockLocal ?? 0) : product.stock;
   return (
     <Card
       className={cn(
         "group cursor-pointer transition-all duration-200 hover:shadow-lg border-2 overflow-hidden",
         disabled && "opacity-60 border-dashed",
-        product.stock === 0 ? "opacity-40 cursor-not-allowed" : "",
         quantity > 0 ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-transparent hover:border-border",
       )}
-      onClick={() => product.stock > 0 && onAdd(product)}
+      onClick={() => onAdd(product)}
     >
       <CardContent className="p-0">
         <div className="relative aspect-square overflow-hidden bg-muted">
@@ -418,15 +507,11 @@ const ProductCard = memo(function ProductCard({
             alt={product.name}
             loading="lazy"
             decoding="async"
-            className={cn(
-              "w-full h-full transition-transform duration-500 group-hover:scale-110",
-              product.imageUrl && product.imageUrl.startsWith("http") ? "object-cover" : "object-contain p-4 opacity-40",
-            )}
+            className="w-full h-full transition-transform duration-500 group-hover:scale-110 object-contain p-4 opacity-40"
             onError={(e) => {
               const img = e.target as HTMLImageElement;
               if (img.src !== window.location.origin + LOGO_FALLBACK) {
                 img.src = LOGO_FALLBACK;
-                img.className = img.className.replace("object-cover", "object-contain p-4 opacity-40");
               }
             }}
           />
@@ -442,15 +527,10 @@ const ProductCard = memo(function ProductCard({
               {quantity}
             </div>
           )}
-          {product.stock <= 5 && product.stock > 0 && (
-            <Badge variant="destructive" className="absolute bottom-2 left-2 text-[10px] py-0 px-2 shadow-md">
-              Bajo stock
+          {esMayorista && stockDisplay === 0 && (
+            <Badge variant="outline" className="absolute bottom-2 left-2 text-[10px] py-0 px-2 shadow-md border-amber-400 text-amber-700 bg-amber-50">
+              Sin stock local
             </Badge>
-          )}
-          {product.stock === 0 && (
-            <div className="absolute inset-0 bg-background/90 backdrop-blur-sm flex items-center justify-center">
-              <Badge variant="secondary" className="text-xs font-medium">Sin stock</Badge>
-            </div>
           )}
         </div>
         <div className="p-2">
@@ -459,7 +539,9 @@ const ProductCard = memo(function ProductCard({
           </h3>
           <div className="flex items-center justify-between">
             <span className="font-bold text-sm text-primary">{formatCurrency(product.price)}</span>
-            <span className="text-[10px] text-muted-foreground font-medium">{product.stock} uds</span>
+            <span className={cn("text-[10px] font-medium", stockDisplay === 0 ? "text-amber-600" : "text-muted-foreground")}>
+              {esMayorista ? `local: ${stockDisplay}` : `${stockDisplay} uds`}
+            </span>
           </div>
         </div>
       </CardContent>
@@ -476,32 +558,33 @@ const ProductListItem = memo(function ProductListItem({
   formatCurrency: (n: number) => string;
   disabled?: boolean;
 }) {
+  const esMayorista = product.stockLocal !== undefined;
+  const stockDisplay = esMayorista ? (product.stockLocal ?? 0) : product.stock;
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-all",
+        "flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-all hover:bg-muted/40",
         disabled && "opacity-60",
-        product.stock === 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-muted/40",
         quantity > 0 ? "border-primary bg-primary/5" : "border-border",
       )}
-      onClick={() => product.stock > 0 && onAdd(product)}
+      onClick={() => onAdd(product)}
     >
       <img
-        src={product.imageUrl && product.imageUrl.startsWith("http") ? product.imageUrl : "/logo.png"}
+        src="/logo.png"
         alt={product.name}
-        className="w-10 h-10 rounded-md object-cover shrink-0 border border-border/30"
-        onError={(e) => { (e.target as HTMLImageElement).src = "/logo.png"; }}
+        className="w-10 h-10 rounded-md object-contain p-1 shrink-0 border border-border/30 opacity-40"
       />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{product.name}</p>
-        <p className="text-xs text-muted-foreground">{product.stock} uds · {formatCurrency(product.price)}</p>
+        <p className="text-xs text-muted-foreground">
+          {esMayorista ? `local: ${stockDisplay}` : `${stockDisplay} uds`} · {formatCurrency(product.price)}
+        </p>
       </div>
       {quantity > 0 && (
         <span className="h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">
           {quantity}
         </span>
       )}
-      {product.stock === 0 && <span className="text-xs text-muted-foreground shrink-0">Sin stock</span>}
     </div>
   );
 });

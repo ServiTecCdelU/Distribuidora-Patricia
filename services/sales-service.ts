@@ -447,6 +447,262 @@ export const getSalesPaginated = async (
   };
 };
 
+/**
+ * Crea una venta desde el flujo mayorista.
+ * - modo "esperar": status=pendiente, NO descuenta stock
+ * - modo "disponible": zeroa cantidadPendienteMayorista, status=listo, descuenta stockLocal
+ */
+export const processSaleMayorista = async (data: {
+  clientId?: string;
+  clientName?: string;
+  clientPhone?: string;
+  sellerId?: string;
+  sellerName?: string;
+  items: CartItem[];
+  paymentType: "cash" | "credit" | "mixed";
+  paymentMethod?: "efectivo" | "transferencia";
+  cashAmount?: number;
+  creditAmount?: number;
+  overpayment?: number;
+  discount?: number;
+  discountType?: "percent" | "fixed";
+  deliveryMethod: "pickup" | "delivery";
+  deliveryAddress: string;
+  modo: "esperar" | "disponible";
+}): Promise<Sale> => {
+  const { modo } = data;
+
+  const subtotal = data.items.reduce((acc, item) => {
+    const base = item.product.price * item.quantity;
+    const disc = item.itemDiscount ? (base * item.itemDiscount) / 100 : 0;
+    return acc + base - disc;
+  }, 0);
+  const discountAmount =
+    data.discount && data.discount > 0
+      ? data.discountType === "percent"
+        ? (subtotal * data.discount) / 100
+        : data.discount
+      : 0;
+  const total = Math.max(0, subtotal - discountAmount);
+
+  const sales = await getSales();
+  const saleNumber = generateSaleNumber(new Date(), sales.length);
+
+  let resolvedClientName = data.clientName ?? "Venta directa";
+  let resolvedTaxCategory: any;
+  let resolvedClientPhone = data.clientPhone ?? null;
+  let resolvedClientCuit: string | null = null;
+  let resolvedClientAddress: string | null = null;
+  let resolvedClientEmail: string | null = null;
+  let resolvedClientDni: string | null = null;
+  let clientAddress = data.deliveryAddress;
+
+  if (data.clientId) {
+    const clientSnap = await getDoc(doc(firestore, CLIENTS_PATH, data.clientId));
+    if (clientSnap.exists()) {
+      const cd = clientSnap.data();
+      resolvedClientName = cd.name ?? resolvedClientName;
+      resolvedTaxCategory = cd.taxCategory ?? null;
+      resolvedClientPhone = cd.phone ?? resolvedClientPhone ?? null;
+      resolvedClientCuit = cd.cuit ?? null;
+      resolvedClientAddress = cd.address ?? null;
+      resolvedClientEmail = cd.email ?? null;
+      resolvedClientDni = cd.dni ?? null;
+      if (data.deliveryMethod === "delivery" && !data.deliveryAddress) {
+        clientAddress = cd.address ?? data.deliveryAddress;
+      }
+    }
+  }
+
+  const saleId = await generateReadableId(firestore, SALES_PATH, "venta", resolvedClientName);
+
+  // Calcular cantidades por ítem según stockLocal
+  const itemsConStock = data.items.map((item) => {
+    const stockLocal = item.product.stockLocal ?? 0;
+    const cantidadPedida = item.quantity;
+    const cantidadStockLocal = Math.min(cantidadPedida, stockLocal);
+    const cantidadPendienteMayorista =
+      modo === "disponible" ? 0 : Math.max(0, cantidadPedida - stockLocal);
+    return {
+      productId: item.product.id,
+      name: item.product.name,
+      price: item.product.price,
+      quantity: cantidadPedida,
+      cantidadPedida,
+      cantidadStockLocal,
+      cantidadPendienteMayorista,
+      ...(item.itemDiscount ? { itemDiscount: item.itemDiscount } : {}),
+    };
+  });
+
+  const saleStatus: Sale["status"] = modo === "esperar" ? "pendiente" : "listo";
+
+  await setDoc(doc(firestore, SALES_PATH, saleId), {
+    saleNumber,
+    clientId: data.clientId ?? null,
+    clientName: resolvedClientName ?? null,
+    clientPhone: resolvedClientPhone ?? null,
+    clientCuit: resolvedClientCuit ?? null,
+    clientDni: resolvedClientDni ?? null,
+    clientEmail: resolvedClientEmail ?? null,
+    clientAddress: resolvedClientAddress ?? null,
+    clientTaxCategory: resolvedTaxCategory ?? null,
+    sellerId: data.sellerId ?? null,
+    sellerName: data.sellerName ?? null,
+    source: "direct",
+    items: itemsConStock,
+    total,
+    paymentType: data.paymentType,
+    paymentMethod: data.paymentMethod ?? "efectivo",
+    cashAmount: data.cashAmount ?? null,
+    creditAmount: data.creditAmount ?? null,
+    overpayment: data.overpayment ?? null,
+    discount: data.discount || null,
+    discountType: data.discount ? (data.discountType ?? null) : null,
+    status: saleStatus,
+    invoiceEmitted: false,
+    invoiceStatus: "pending",
+    deliveryMethod: data.deliveryMethod ?? "pickup",
+    deliveryAddress: clientAddress ?? null,
+    createdAt: serverTimestamp(),
+  });
+
+  // Descontar stock solo en modo "disponible"
+  if (modo === "disponible") {
+    const { descontarStockVenta } = await import("@/services/stock-service");
+    const itemsConStockLocal = itemsConStock
+      .filter((i) => i.cantidadStockLocal > 0)
+      .map((i) => ({ productoId: i.productId, cantidad: i.cantidadStockLocal }));
+    if (itemsConStockLocal.length > 0) {
+      await descontarStockVenta(itemsConStockLocal, saleId);
+    }
+  }
+
+  // Crédito
+  const amountToCredit =
+    data.paymentType === "credit"
+      ? total
+      : data.paymentType === "mixed"
+        ? (data.creditAmount ?? 0)
+        : 0;
+
+  if (amountToCredit > 0 && data.clientId) {
+    const clientRef = doc(firestore, CLIENTS_PATH, data.clientId);
+    const clientSnap = await getDoc(clientRef);
+    if (clientSnap.exists()) {
+      await updateDoc(clientRef, {
+        currentBalance: (clientSnap.data().currentBalance || 0) + amountToCredit,
+      });
+    }
+    const txId = await generateReadableId(firestore, TRANSACTIONS_PATH, "transaccion", resolvedClientName);
+    await setDoc(doc(firestore, TRANSACTIONS_PATH, txId), {
+      clientId: data.clientId,
+      type: "debt",
+      amount: amountToCredit,
+      description: `Venta #${saleNumber}`,
+      date: serverTimestamp(),
+      saleId,
+      saleNumber,
+    });
+  }
+
+  // Saldo a favor
+  const overpaymentAmount = data.overpayment ?? 0;
+  if (overpaymentAmount > 0 && data.clientId) {
+    const clientRef = doc(firestore, CLIENTS_PATH, data.clientId);
+    const clientSnap = await getDoc(clientRef);
+    if (clientSnap.exists()) {
+      await updateDoc(clientRef, {
+        currentBalance: (clientSnap.data().currentBalance || 0) - overpaymentAmount,
+      });
+    }
+    const txId = await generateReadableId(firestore, TRANSACTIONS_PATH, "transaccion", resolvedClientName);
+    await setDoc(doc(firestore, TRANSACTIONS_PATH, txId), {
+      clientId: data.clientId,
+      type: "payment",
+      amount: overpaymentAmount,
+      description: `Saldo a favor (Venta #${saleNumber})`,
+      date: serverTimestamp(),
+      saleId,
+      saleNumber,
+    });
+  }
+
+  // Comisión
+  if (data.sellerId) {
+    const commissionAmount = total * COMMISSION_RATE;
+    const now = new Date();
+    const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "00")}`;
+    const cId = await generateReadableId(firestore, COMMISSIONS_PATH, "comision", `${data.sellerName || "vendedor"}_${yyyymm}`);
+    await setDoc(doc(firestore, COMMISSIONS_PATH, cId), {
+      sellerId: data.sellerId,
+      saleId,
+      saleNumber,
+      clientName: data.clientName || null,
+      saleTotal: total,
+      commissionRate: COMMISSION_RATE * 100,
+      commissionAmount,
+      isPaid: false,
+      createdAt: serverTimestamp(),
+    });
+    const sellerSnap = await getDoc(doc(firestore, SELLERS_PATH, data.sellerId));
+    if (sellerSnap.exists()) {
+      await updateDoc(doc(firestore, SELLERS_PATH, data.sellerId), {
+        totalSales: (sellerSnap.data().totalSales || 0) + total,
+        totalCommission: (sellerSnap.data().totalCommission || 0) + commissionAmount,
+      });
+    }
+  }
+
+  return {
+    id: saleId,
+    saleNumber,
+    clientId: data.clientId,
+    clientName: resolvedClientName,
+    clientPhone: resolvedClientPhone ?? undefined,
+    clientCuit: resolvedClientCuit ?? undefined,
+    clientAddress: resolvedClientAddress ?? undefined,
+    sellerId: data.sellerId,
+    sellerName: data.sellerName,
+    source: "direct",
+    items: itemsConStock,
+    total,
+    paymentType: data.paymentType,
+    paymentMethod: data.paymentMethod ?? "efectivo",
+    cashAmount: data.cashAmount,
+    creditAmount: data.creditAmount,
+    discount: data.discount,
+    discountType: data.discountType,
+    status: saleStatus,
+    invoiceEmitted: false,
+    invoiceStatus: "pending",
+    deliveryMethod: data.deliveryMethod,
+    deliveryAddress: clientAddress,
+    createdAt: new Date(),
+  };
+};
+
+export const updateSaleMayoristaStatus = async (
+  saleId: string,
+  status: "listo" | "pendiente"
+): Promise<void> => {
+  await updateDoc(doc(firestore, SALES_PATH, saleId), { status });
+};
+
+export const getSalesPendientesMayorista = async (): Promise<Sale[]> => {
+  const q = query(
+    collection(firestore, SALES_PATH),
+    where("status", "==", "pendiente"),
+    orderBy("createdAt", "asc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+    createdAt: d.data().createdAt?.toDate ? d.data().createdAt.toDate() : new Date(),
+  } as Sale));
+};
+
 export const getSalesByDateRange = async (
   startDate: Date,
   endDate: Date,
