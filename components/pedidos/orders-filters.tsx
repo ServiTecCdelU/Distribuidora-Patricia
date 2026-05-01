@@ -19,8 +19,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import type { Client, Order, OrderStatus, City } from "@/lib/types";
-import { CITIES } from "@/lib/types";
+import type { Client, Order, OrderStatus } from "@/lib/types";
 import {
   Calendar,
   User,
@@ -45,15 +44,12 @@ interface OrdersFiltersProps {
   setFilterClient: (value: string) => void;
   filterSeller: string;
   setFilterSeller: (value: string) => void;
-  filterCity: string;
-  setFilterCity: (value: string) => void;
   filterTransportista?: string;
   setFilterTransportista?: (value: string) => void;
   clients: Client[];
   sellers: { id: string; name: string }[];
   transportistas?: { id: string; name: string }[];
   orders: Order[];
-  cities?: string[];
 }
 
 export function OrdersFilters({
@@ -67,24 +63,19 @@ export function OrdersFilters({
   setFilterClient,
   filterSeller,
   setFilterSeller,
-  filterCity,
-  setFilterCity,
   filterTransportista,
   setFilterTransportista,
   clients,
   sellers,
   transportistas,
   orders,
-  cities,
 }: OrdersFiltersProps) {
-  const cityList = cities || CITIES;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [tmp, setTmp] = useState({
     dateFrom: filterDateFrom,
     dateTo: filterDateTo,
     client: filterClient,
     seller: filterSeller,
-    city: filterCity,
     transportista: filterTransportista || "",
   });
 
@@ -104,10 +95,9 @@ export function OrdersFilters({
     if (filterDateTo) count++;
     if (filterClient) count++;
     if (filterSeller) count++;
-    if (filterCity) count++;
     if (filterTransportista && filterTransportista !== "all-transportistas") count++;
     return count;
-  }, [filterDateFrom, filterDateTo, filterClient, filterSeller, filterCity, filterTransportista]);
+  }, [filterDateFrom, filterDateTo, filterClient, filterSeller, filterTransportista]);
 
   const handleOpenModal = () => {
     setTmp({
@@ -115,7 +105,6 @@ export function OrdersFilters({
       dateTo: filterDateTo,
       client: filterClient,
       seller: filterSeller,
-      city: filterCity,
       transportista: filterTransportista || "",
     });
     setMobileOpen(true);
@@ -126,7 +115,6 @@ export function OrdersFilters({
     setFilterDateTo(tmp.dateTo);
     setFilterClient(tmp.client);
     setFilterSeller(tmp.seller);
-    setFilterCity(tmp.city);
     if (setFilterTransportista) {
       setFilterTransportista(tmp.transportista === "all-transportistas" ? "" : tmp.transportista);
     }
@@ -139,7 +127,6 @@ export function OrdersFilters({
       dateTo: "",
       client: "",
       seller: "",
-      city: "",
       transportista: "",
     });
   };
@@ -207,7 +194,7 @@ export function OrdersFilters({
       </div>
 
       {/* Desktop: filter grid */}
-      <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 p-4 bg-gray-50/80 rounded-xl border border-gray-200">
+      <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 p-4 bg-gray-50/80 rounded-xl border border-gray-200">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-gray-600 flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5" />
@@ -253,31 +240,6 @@ export function OrdersFilters({
               {clients.map((client) => (
                 <SelectItem key={client.id} value={client.id}>
                   {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-gray-600 flex items-center gap-1.5">
-            <Truck className="h-3.5 w-3.5" />
-            Ciudad
-          </label>
-          <Select
-            value={filterCity || "all-cities"}
-            onValueChange={(value) =>
-              setFilterCity(value === "all-cities" ? "" : value)
-            }
-          >
-            <SelectTrigger className="bg-white">
-              <SelectValue placeholder="Todas las ciudades" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all-cities">Todas las ciudades</SelectItem>
-              {cityList.map((city) => (
-                <SelectItem key={city} value={city}>
-                  {city}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -397,32 +359,6 @@ export function OrdersFilters({
                   {clients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Ciudad */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-gray-600 flex items-center gap-1.5">
-                <Truck className="h-3.5 w-3.5" />
-                Ciudad
-              </Label>
-              <Select
-                value={tmp.city || "all-cities"}
-                onValueChange={(value) =>
-                  setTmp((p) => ({ ...p, city: value === "all-cities" ? "" : value }))
-                }
-              >
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Todas las ciudades" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all-cities">Todas las ciudades</SelectItem>
-                  {CITIES.map((city) => (
-                    <SelectItem key={city} value={city}>
-                      {city}
                     </SelectItem>
                   ))}
                 </SelectContent>

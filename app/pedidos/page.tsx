@@ -10,8 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ClientModal } from "@/components/clientes/client-modal";
 import { ordersApi, salesApi, clientsApi, paymentsApi, sellersApi } from "@/lib/api";
 import type { Order, OrderStatus, Client, Seller } from "@/lib/types";
-import { CITIES } from "@/lib/types";
-import { Package, Search, Calendar, User, Filter, X, MapPin, Loader2, Navigation, ClipboardList } from "lucide-react";
+import { Package, Search, Calendar, User, Filter, X, Loader2, Navigation, ClipboardList } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -87,7 +86,6 @@ export default function PedidosPage() {
   const [filterDateTo, setFilterDateTo] = useState<string>("");
   const [filterClient, setFilterClient] = useState<string>("");
   const [filterSeller, setFilterSeller] = useState<string>("");
-  const [filterCity, setFilterCity] = useState<string>("");
   const [filterTransportista, setFilterTransportista] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -111,10 +109,6 @@ export default function PedidosPage() {
 
   const [routeModalOpen, setRouteModalOpen] = useState(false);
 
-  // Gestión de ciudades de reparto
-  const [extraCities, setExtraCities] = useState<string[]>([]);
-  const [citiesModalOpen, setCitiesModalOpen] = useState(false);
-  const [newCityInput, setNewCityInput] = useState("");
   // Selección masiva
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkTransportistaId, setBulkTransportistaId] = useState<string>("");
@@ -154,41 +148,6 @@ export default function PedidosPage() {
       setLoading(false);
     }
   }, []);
-
-  // Load extra cities from Firestore
-  useEffect(() => {
-    const loadExtraCities = async () => {
-      try {
-        const { doc, getDoc } = await import("firebase/firestore");
-        const ref = doc(firestore, "configuracion", "ciudades_reparto");
-        const snap = await getDoc(ref);
-        if (snap.exists()) setExtraCities(snap.data().cities || []);
-      } catch {}
-    };
-    loadExtraCities();
-  }, []);
-
-  const handleAddCity = async () => {
-    const city = newCityInput.trim();
-    if (!city || extraCities.includes(city)) return;
-    const updated = [...extraCities, city];
-    try {
-      const { doc, setDoc } = await import("firebase/firestore");
-      await setDoc(doc(firestore, "configuracion", "ciudades_reparto"), { cities: updated }, { merge: true });
-      setExtraCities(updated);
-      setNewCityInput("");
-      toast.success("Ciudad agregada");
-    } catch { toast.error("Error al guardar"); }
-  };
-
-  const handleRemoveCity = async (city: string) => {
-    const updated = extraCities.filter(c => c !== city);
-    try {
-      const { doc, setDoc } = await import("firebase/firestore");
-      await setDoc(doc(firestore, "configuracion", "ciudades_reparto"), { cities: updated }, { merge: true });
-      setExtraCities(updated);
-    } catch { toast.error("Error al eliminar"); }
-  };
 
   const handleGenerateRemito = useCallback(async (order: Order) => {
     // If remito already exists, just download it
@@ -583,7 +542,6 @@ export default function PedidosPage() {
     setFilterDateTo("");
     setFilterClient("");
     setFilterSeller("");
-    setFilterCity("");
     setFilterTransportista("");
     setSearchQuery("");
   }, []);
@@ -595,7 +553,6 @@ export default function PedidosPage() {
       filterDateTo ||
       filterClient ||
       filterSeller ||
-      filterCity ||
       filterTransportista ||
       searchQuery
     );
@@ -605,7 +562,6 @@ export default function PedidosPage() {
     filterDateTo,
     filterClient,
     filterSeller,
-    filterCity,
     filterTransportista,
     searchQuery,
   ]);
@@ -641,10 +597,6 @@ export default function PedidosPage() {
       filtered = filtered.filter((o) => o.sellerId === filterSeller);
     }
 
-    if (filterCity) {
-      filtered = filtered.filter((o) => o.city === filterCity);
-    }
-
     if (filterTransportista) {
       if (filterTransportista === "unassigned") {
         filtered = filtered.filter((o) => !o.transportistaId);
@@ -675,27 +627,24 @@ export default function PedidosPage() {
     filterSeller,
     filterDateFrom,
     filterDateTo,
-    filterCity,
     filterTransportista,
     user,
   ]);
 
-  const allCities = useMemo(() => [...CITIES, ...extraCities.filter(c => !CITIES.includes(c as any))], [extraCities]);
 
-  // Group orders by city, sorted by address within each city
-  const ordersGroupedByCity = useMemo(() => {
+  // Group orders by client name
+  const ordersGroupedByClient = useMemo(() => {
     const groups: Record<string, Order[]> = {};
 
     filteredOrders.forEach((order) => {
-      const isPickup = (order as any).deliveryMethod === "pickup" || order.address === "Retiro en local";
-      const city = isPickup ? "En el local" : (order.city || "Sin ciudad");
-      if (!groups[city]) groups[city] = [];
-      groups[city].push(order);
+      const client = order.clientName || "Sin cliente";
+      if (!groups[client]) groups[client] = [];
+      groups[client].push(order);
     });
 
-    // Sort: non-completed first, then completed; within each group sort by address
-    Object.keys(groups).forEach((city) => {
-      groups[city].sort((a, b) => {
+    // Sort: non-completed first, then completed; within each group sort by date
+    Object.keys(groups).forEach((client) => {
+      groups[client].sort((a, b) => {
         const aComplete = a.status === "completed" ? 1 : 0;
         const bComplete = b.status === "completed" ? 1 : 0;
         if (aComplete !== bComplete) return aComplete - bComplete;
@@ -703,16 +652,14 @@ export default function PedidosPage() {
       });
     });
 
-    // Sort cities: "En el local" first, then named cities alphabetical, "Sin ciudad" last
-    const sortedCities = Object.keys(groups).sort((a, b) => {
-      if (a === "En el local") return -1;
-      if (b === "En el local") return 1;
-      if (a === "Sin ciudad") return 1;
-      if (b === "Sin ciudad") return -1;
+    // Sort clients alphabetically, "Sin cliente" last
+    const sortedClients = Object.keys(groups).sort((a, b) => {
+      if (a === "Sin cliente") return 1;
+      if (b === "Sin cliente") return -1;
       return a.localeCompare(b);
     });
 
-    return sortedCities.map((city) => ({ city, orders: groups[city] }));
+    return sortedClients.map((client) => ({ client, orders: groups[client] }));
   }, [filteredOrders]);
 
   const cargoList = useMemo(() => {
@@ -750,12 +697,12 @@ export default function PedidosPage() {
     });
   }, []);
 
-  const toggleCity = useCallback((cityOrders: Order[]) => {
+  const toggleGroup = useCallback((groupOrders: Order[]) => {
     setSelectedOrderIds(prev => {
-      const allSelected = cityOrders.every(o => prev.has(o.id));
+      const allSelected = groupOrders.every(o => prev.has(o.id));
       const next = new Set(prev);
-      if (allSelected) cityOrders.forEach(o => next.delete(o.id));
-      else cityOrders.forEach(o => next.add(o.id));
+      if (allSelected) groupOrders.forEach(o => next.delete(o.id));
+      else groupOrders.forEach(o => next.add(o.id));
       return next;
     });
   }, []);
@@ -778,24 +725,24 @@ export default function PedidosPage() {
     const dateStr = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "long", year: "numeric" }).format(now);
     const remitoNum = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}${String(now.getDate()).padStart(2,"0")}-${String(Math.floor(Math.random()*9000)+1000)}`;
     const stampStr = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(now);
-    // cargoList y ordersGroupedByCity se leen del closure
-    let html = `<!DOCTYPE html><html><head><title>Listado de Carga</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;padding:24px;font-size:13px}table{width:100%;border-collapse:collapse}th,td{padding:7px 12px;border-bottom:1px solid #f3f4f6}th{font-size:11px;font-weight:600;color:#4b5563;background:#f9fafb;border-bottom:1px solid #e5e7eb}td.right{text-align:right}th.right{text-align:right}th.center,td.center{text-align:center}.checkbox{display:inline-block;width:14px;height:14px;border:2px solid #9ca3af;border-radius:2px}.city-header{background:#1f2937;color:white;padding:6px 12px;font-size:11px;font-weight:700;text-transform:uppercase}.section{border:1px solid #d1d5db;border-radius:8px;overflow:hidden;margin-bottom:16px}.section-title{background:#f3f4f6;padding:8px 12px;border-bottom:1px solid #d1d5db;font-size:10px;font-weight:700;text-transform:uppercase;color:#374151}.tfoot td{border-top:2px solid #d1d5db;background:#f3f4f6;font-weight:700}.stop{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-bottom:1px solid #e5e7eb}.stop-num{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#1f2937;color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}.footer{margin-top:16px;text-align:center;font-size:10px;color:#9ca3af}@media print{body{padding:16px}}</style></head><body>`;
+    // cargoList y ordersGroupedByClient se leen del closure
+    let html = `<!DOCTYPE html><html><head><title>Listado de Carga</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;padding:24px;font-size:13px}table{width:100%;border-collapse:collapse}th,td{padding:7px 12px;border-bottom:1px solid #f3f4f6}th{font-size:11px;font-weight:600;color:#4b5563;background:#f9fafb;border-bottom:1px solid #e5e7eb}td.right{text-align:right}th.right{text-align:right}th.center,td.center{text-align:center}.checkbox{display:inline-block;width:14px;height:14px;border:2px solid #9ca3af;border-radius:2px}.client-header{background:#1f2937;color:white;padding:6px 12px;font-size:11px;font-weight:700;text-transform:uppercase}.section{border:1px solid #d1d5db;border-radius:8px;overflow:hidden;margin-bottom:16px}.section-title{background:#f3f4f6;padding:8px 12px;border-bottom:1px solid #d1d5db;font-size:10px;font-weight:700;text-transform:uppercase;color:#374151}.tfoot td{border-top:2px solid #d1d5db;background:#f3f4f6;font-weight:700}.stop{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-bottom:1px solid #e5e7eb}.stop-num{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#1f2937;color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}.footer{margin-top:16px;text-align:center;font-size:10px;color:#9ca3af}@media print{body{padding:16px}}</style></head><body>`;
     html += `<h2 style="margin-bottom:16px;font-size:18px">Listado de Carga — ${dateStr} | N° ${remitoNum}</h2>`;
     html += `<div class="section"><div class="section-title">Mercadería</div><table><thead><tr><th style="width:40px">N°</th><th>Producto</th><th class="right" style="width:70px">Cant.</th><th class="center" style="width:50px">OK</th></tr></thead><tbody>`;
     cargoList.forEach((item, i) => {
       html += `<tr style="${i%2?"background:#f9fafb":""}"><td style="color:#9ca3af;font-size:11px">${i+1}</td><td style="font-weight:500">${item.name}</td><td class="right" style="font-weight:700;font-size:15px">${item.quantity}</td><td class="center"><span class="checkbox"></span></td></tr>`;
     });
     html += `</tbody><tr class="tfoot"><td></td><td>${cargoList.length} productos</td><td class="right">${cargoList.reduce((a,i)=>a+i.quantity,0)}</td><td></td></tr></table></div>`;
-    html += `<div class="section"><div class="section-title">Ruta de Entrega</div>`;
-    ordersGroupedByCity.forEach(({ city, orders: cityOrders }) => {
-      html += `<div class="city-header">${city} — ${cityOrders.length} entregas</div>`;
-      cityOrders.forEach((order, idx) => {
-        html += `<div class="stop"><div class="stop-num">${idx+1}</div><div style="flex:1"><div style="display:flex;justify-content:space-between"><strong>${order.clientName||"Sin cliente"}</strong><span class="checkbox"></span></div><div style="font-size:11px;color:#4b5563;margin-top:2px">${order.address||""}</div><div style="margin-top:4px;font-size:11px">${order.items.map(it=>`<strong>${it.quantity}</strong>×${it.name}`).join(" | ")}</div></div></div>`;
+    html += `<div class="section"><div class="section-title">Entregas por Cliente</div>`;
+    ordersGroupedByClient.forEach(({ client, orders: clientOrders }) => {
+      html += `<div class="client-header">${client} — ${clientOrders.length} ${clientOrders.length === 1 ? "pedido" : "pedidos"}</div>`;
+      clientOrders.forEach((order, idx) => {
+        html += `<div class="stop"><div class="stop-num">${idx+1}</div><div style="flex:1"><div style="display:flex;justify-content:space-between"><strong>${order.address||"Sin dirección"}</strong><span class="checkbox"></span></div><div style="margin-top:4px;font-size:11px">${order.items.map(it=>`<strong>${it.quantity}</strong>×${it.name}`).join(" | ")}</div></div></div>`;
       });
     });
     html += `</div><div class="footer">Generado el ${stampStr}</div></body></html>`;
     printHtml(html);
-  }, [cargoList, ordersGroupedByCity, printHtml]);
+  }, [cargoList, ordersGroupedByClient, printHtml]);
 
   const handleBulkAssign = useCallback(async () => {
     if (!bulkTransportistaId || selectedOrderIds.size === 0) return;
@@ -865,11 +812,6 @@ export default function PedidosPage() {
                 Limpiar filtros
               </Button>
             )}
-            {user?.role === "admin" && (
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => setCitiesModalOpen(true)}>
-                <MapPin className="h-4 w-4" /> <span className="hidden sm:inline">Ciudades</span>
-              </Button>
-            )}
             <Button
               variant="outline"
               size="sm"
@@ -906,15 +848,12 @@ export default function PedidosPage() {
           setFilterClient={setFilterClient}
           filterSeller={filterSeller}
           setFilterSeller={setFilterSeller}
-          filterCity={filterCity}
-          setFilterCity={setFilterCity}
           filterTransportista={filterTransportista}
           setFilterTransportista={setFilterTransportista}
           clients={clients}
           sellers={uniqueSellers}
           transportistas={transportistas}
           orders={orders}
-          cities={allCities}
         />
       </div>
 
@@ -976,23 +915,23 @@ export default function PedidosPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {ordersGroupedByCity.map(({ city, orders: cityOrders }) => (
-            <div key={city}>
-              {/* City header */}
+          {ordersGroupedByClient.map(({ client, orders: clientOrders }) => (
+            <div key={client}>
+              {/* Client header */}
               <div className="flex items-center gap-2 mb-3 px-1">
                 {user?.role === "admin" && (
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-gray-300 accent-teal-600 cursor-pointer"
-                    checked={cityOrders.length > 0 && cityOrders.every(o => selectedOrderIds.has(o.id))}
-                    onChange={() => toggleCity(cityOrders)}
+                    checked={clientOrders.length > 0 && clientOrders.every(o => selectedOrderIds.has(o.id))}
+                    onChange={() => toggleGroup(clientOrders)}
                   />
                 )}
-                <MapPin className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-bold text-foreground">{city}</h2>
-                <span className="text-sm text-muted-foreground">({cityOrders.length} {cityOrders.length === 1 ? "pedido" : "pedidos"})</span>
-                {user?.role === "admin" && cityOrders.some(o => selectedOrderIds.has(o.id)) && (
-                  <Badge variant="secondary" className="ml-auto text-xs">{cityOrders.filter(o => selectedOrderIds.has(o.id)).length} sel.</Badge>
+                <User className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">{client}</h2>
+                <span className="text-sm text-muted-foreground">({clientOrders.length} {clientOrders.length === 1 ? "pedido" : "pedidos"})</span>
+                {user?.role === "admin" && clientOrders.some(o => selectedOrderIds.has(o.id)) && (
+                  <Badge variant="secondary" className="ml-auto text-xs">{clientOrders.filter(o => selectedOrderIds.has(o.id)).length} sel.</Badge>
                 )}
               </div>
 
@@ -1005,15 +944,14 @@ export default function PedidosPage() {
                         <th className="px-3 py-3 w-8"></th>
                       )}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pedido</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cliente</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Direccion</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Dirección</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Productos</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Estado</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Accion</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {cityOrders.map((order, index) => (
+                    {clientOrders.map((order, index) => (
                       <OrderCard
                         key={order.id}
                         order={order}
@@ -1034,7 +972,7 @@ export default function PedidosPage() {
 
               {/* Mobile cards */}
               <div className="lg:hidden space-y-3 mb-3">
-                {cityOrders.map((order, index) => (
+                {clientOrders.map((order, index) => (
                   <OrderCard
                     key={order.id}
                     order={order}
@@ -1114,50 +1052,6 @@ export default function PedidosPage() {
         orders={filteredOrders}
       />
 
-      {/* Dialog gestión de ciudades */}
-      <Dialog open={citiesModalOpen} onOpenChange={setCitiesModalOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Ciudades de reparto</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Nueva ciudad..."
-                value={newCityInput}
-                onChange={e => setNewCityInput(e.target.value)}
-                className="h-9 text-sm"
-                onKeyDown={e => e.key === "Enter" && handleAddCity()}
-              />
-              <Button size="sm" onClick={handleAddCity} disabled={!newCityInput.trim()}>Agregar</Button>
-            </div>
-            <div className="space-y-1 max-h-60 overflow-y-auto">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Ciudades fijas</p>
-              {CITIES.map(c => (
-                <div key={c} className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 text-sm">
-                  {c}
-                  <Badge variant="secondary" className="text-[10px]">fija</Badge>
-                </div>
-              ))}
-              {extraCities.length > 0 && (
-                <>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-2">Ciudades agregadas</p>
-                  {extraCities.map(c => (
-                    <div key={c} className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 text-sm">
-                      {c}
-                      <Button
-                        variant="ghost" size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemoveCity(c)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </MainLayout>
   );
 }
