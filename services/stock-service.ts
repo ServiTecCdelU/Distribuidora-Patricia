@@ -9,6 +9,7 @@ import {
   serverTimestamp,
   updateDoc,
   increment,
+  getDoc,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import type { StockMovimiento } from "@/lib/types";
@@ -83,4 +84,64 @@ export const descontarStockVenta = async (
       })
     )
   );
+};
+
+/**
+ * Actualiza ventas pendientes por orden de fecha (FIFO) cuando llega stock de un producto.
+ * Si todos los items de una venta quedan cubiertos, la venta pasa a "listo".
+ */
+export const actualizarVentasPendientesFIFO = async (
+  productoId: string,
+  unidadesDisponibles: number
+): Promise<void> => {
+  if (unidadesDisponibles <= 0) return;
+
+  const q = query(
+    collection(firestore, "ventas"),
+    where("status", "==", "pendiente"),
+    orderBy("createdAt", "asc")
+  );
+  const snap = await getDocs(q);
+
+  let restante = unidadesDisponibles;
+
+  for (const ventaDoc of snap.docs) {
+    if (restante <= 0) break;
+
+    const data = ventaDoc.data();
+    const items: any[] = data.items ?? [];
+
+    const tieneProductoPendiente = items.some(
+      (i) => i.productId === productoId && (i.cantidadPendienteMayorista ?? 0) > 0
+    );
+    if (!tieneProductoPendiente) continue;
+
+    let cambiado = false;
+    const newItems = items.map((item) => {
+      if (item.productId !== productoId) return item;
+      const pendiente = item.cantidadPendienteMayorista ?? 0;
+      if (pendiente <= 0) return item;
+
+      const cubrir = Math.min(pendiente, restante);
+      restante -= cubrir;
+      cambiado = true;
+
+      return {
+        ...item,
+        cantidadPendienteMayorista: pendiente - cubrir,
+        cantidadStockLocal: (item.cantidadStockLocal ?? 0) + cubrir,
+      };
+    });
+
+    if (!cambiado) continue;
+
+    const todoCubierto = newItems.every(
+      (i: any) => (i.cantidadPendienteMayorista ?? 0) === 0
+    );
+
+    await updateDoc(doc(firestore, "ventas", ventaDoc.id), {
+      items: newItems,
+      ...(todoCubierto ? { status: "listo" } : {}),
+    });
+  }
 };

@@ -50,6 +50,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RecepcionMercaderia } from "@/components/productos/RecepcionMercaderia";
 
 // Tipos para los filtros
 type PriceFilter = "all" | "0-2800" | "2801-3000" | "3001-3200" | "3201+";
@@ -850,6 +852,12 @@ export default function ProductosPage() {
 
   return (
     <MainLayout title="Productos" description="Gestiona tu catálogo de productos">
+      <Tabs defaultValue="catalogo">
+        <TabsList className="mb-4 rounded-xl">
+          <TabsTrigger value="catalogo" className="rounded-lg">Catálogo</TabsTrigger>
+          <TabsTrigger value="recepcion" className="rounded-lg">Recepción de mercadería</TabsTrigger>
+        </TabsList>
+        <TabsContent value="catalogo">
       {/* Header */}
       <div className="mb-4 sm:mb-6">
         <PageHeader
@@ -1727,6 +1735,12 @@ export default function ProductosPage() {
           )}
         </>
       )}
+
+        </TabsContent>
+        <TabsContent value="recepcion" className="mt-2">
+          <RecepcionMercaderia />
+        </TabsContent>
+      </Tabs>
 
       {/* Modales */}
       <ProductModal
