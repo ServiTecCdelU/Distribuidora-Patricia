@@ -2,45 +2,39 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
-
-const MIN_DURATION_MS = 350
 
 export function RouteLoader() {
   const pathname = usePathname()
   const [visible, setVisible] = useState(false)
-  const startRef = useRef<number | null>(null)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const showRef = useRef<NodeJS.Timeout | null>(null)
+  const hideRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-      timeoutRef.current = null
-    }
+    if (showRef.current) clearTimeout(showRef.current)
+    if (hideRef.current) clearTimeout(hideRef.current)
 
-    const now = Date.now()
-    startRef.current = now
-    setVisible(true)
+    // Solo mostrar barra si la navegación tarda más de 150ms
+    showRef.current = setTimeout(() => {
+      setVisible(true)
+    }, 150)
 
-    timeoutRef.current = setTimeout(() => {
+    // Ocultar después de que la página cargó (se dispara el efecto del nuevo pathname)
+    hideRef.current = setTimeout(() => {
       setVisible(false)
-    }, MIN_DURATION_MS)
+    }, 100)
 
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
+      if (showRef.current) clearTimeout(showRef.current)
+      if (hideRef.current) clearTimeout(hideRef.current)
+      setVisible(false)
     }
   }, [pathname])
 
   if (!visible) return null
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/60 backdrop-blur-sm">
-      <div className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-sm">
-        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-        <span className="text-sm text-foreground">Cargando...</span>
-      </div>
+    <div className="fixed top-0 left-0 right-0 z-[60] h-0.5">
+      <div className="h-full bg-primary/80 animate-pulse rounded-r-full" style={{ width: '70%' }} />
     </div>
   )
 }
