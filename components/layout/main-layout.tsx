@@ -4,7 +4,6 @@ import React, { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AppSidebar } from './app-sidebar'
 import { useAuth } from '@/hooks/use-auth'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 
@@ -30,19 +29,8 @@ export function MainLayout({ children, title, description }: MainLayoutProps) {
     }
   }, [loading, user, router])
 
-  if (loading || !user) {
-    return (
-      <div className="min-h-screen bg-background p-6 lg:p-8">
-        <div className="space-y-4">
-          <Skeleton className="h-7 w-48" />
-          <Skeleton className="h-4 w-64" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-          </div>
-        </div>
-      </div>
-    )
+  if (!loading && !user) {
+    return null
   }
 
   return (

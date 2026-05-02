@@ -5,8 +5,32 @@ import type { User } from '@/lib/types'
 import { onAuthChange, signOut } from '@/services/auth-service'
 import { ensureUserProfile } from '@/services/users-service'
 
-// Caché en memoria del perfil — evita re-leer Firestore en cada navegación
-let cachedProfile: { uid: string; user: User } | null = null
+const STORAGE_KEY = 'auth_profile'
+
+// Restaurar perfil de sessionStorage para render instantáneo
+function getStoredProfile(): { uid: string; user: User } | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+function storeProfile(uid: string, user: User) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ uid, user }))
+  } catch { /* quota exceeded — no-op */ }
+}
+
+function clearStoredProfile() {
+  try { sessionStorage.removeItem(STORAGE_KEY) } catch {}
+}
+
+// Caché en memoria + sessionStorage
+let cachedProfile: { uid: string; user: User } | null = getStoredProfile()
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(cachedProfile?.user ?? null)
@@ -16,6 +40,7 @@ export const useAuth = () => {
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (!firebaseUser) {
         cachedProfile = null
+        clearStoredProfile()
         setUser(null)
         setLoading(false)
         return
@@ -35,12 +60,14 @@ export const useAuth = () => {
       })
       if (!profile.isActive) {
         cachedProfile = null
+        clearStoredProfile()
         await signOut()
         setUser(null)
         setLoading(false)
         return
       }
       cachedProfile = { uid: firebaseUser.uid, user: profile }
+      storeProfile(firebaseUser.uid, profile)
       setUser(profile)
       setLoading(false)
     })
@@ -54,4 +81,5 @@ export const useAuth = () => {
 /** Invalida el caché del perfil (usar tras cambios de rol, etc.) */
 export const invalidateAuthCache = () => {
   cachedProfile = null
+  clearStoredProfile()
 }
