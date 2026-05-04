@@ -79,6 +79,57 @@ export const formatTime = (date: unknown): string => {
 
 export const formatPrice = (price: number): string => formatCurrency(price);
 
+const dateShortFormatter = new Intl.DateTimeFormat("es-AR", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const dateFullFormatter = new Intl.DateTimeFormat("es-AR", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const compactNumberFormatter = new Intl.NumberFormat("es-AR", {
+  notation: "compact",
+  compactDisplay: "short",
+  maximumFractionDigits: 1,
+});
+
+/** Formato corto: dd/mm HH:mm (sin año) */
+export const formatDateShort = (date: unknown): string => {
+  if (!date) return "-";
+  try {
+    const d = toDate(date);
+    if (isNaN(d.getTime()) || d.getTime() === 0) return "-";
+    return dateShortFormatter.format(d);
+  } catch {
+    return "-";
+  }
+};
+
+/** Formato largo: "1 de enero de 2025, 14:30" */
+export const formatDateFull = (date: unknown): string => {
+  if (!date) return "-";
+  try {
+    const d = toDate(date);
+    if (isNaN(d.getTime()) || d.getTime() === 0) return "-";
+    return dateFullFormatter.format(d);
+  } catch {
+    return "-";
+  }
+};
+
+/** Formato compacto para numeros grandes: 1.5M, 200K, etc. */
+export const formatCompactNumber = (value: number): string => {
+  const safe = typeof value === "number" && !isNaN(value) ? value : 0;
+  return compactNumberFormatter.format(safe);
+};
+
 // Deja solo digitos de un CUIT/CUIL (acepta "20-12345678-9", "20.12.345.678.9", "20123456789", etc.)
 export const normalizeCuit = (value: unknown): string => {
   if (value === null || value === undefined) return "";

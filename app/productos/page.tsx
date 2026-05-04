@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { productsApi } from "@/lib/api";
 import type { Product } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils/format";
+import { formatCurrency, formatCompactNumber } from "@/lib/utils/format";
 import {
   Plus,
   Search,
@@ -176,7 +176,7 @@ export default function ProductosPage() {
         setProducts(data);
       } catch (error) {
         if (!mounted) return;
-        // Error silenciado
+        toast.error("Error al cargar productos");
       } finally {
         if (!mounted) return;
         setLoading(false);
@@ -200,7 +200,7 @@ export default function ProductosPage() {
       const data = await productsApi.getAll();
       setProducts(data);
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al recargar productos");
     } finally {
       setLoading(false);
     }
@@ -504,7 +504,6 @@ export default function ProductosPage() {
 
       toast.success(`"${product.name}" habilitado`);
     } catch (error) {
-      // Error silenciado
       toast.error("Error al habilitar producto");
     }
   };
@@ -531,7 +530,6 @@ export default function ProductosPage() {
 
       toast.success(`"${productToDeactivate.name}" deshabilitado`);
     } catch (error) {
-      // Error silenciado
       toast.error("Error al deshabilitar producto");
     } finally {
       setDeactivateDialogOpen(false);
@@ -571,7 +569,6 @@ export default function ProductosPage() {
 
       toast.success(`${productsToDisable.length} productos deshabilitados`);
     } catch (error) {
-      // Error silenciado
       toast.error("Error al deshabilitar productos");
     } finally {
       setBulkDeactivateDialogOpen(false);
@@ -625,7 +622,7 @@ export default function ProductosPage() {
       }
       setModalOpen(false);
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al guardar el producto");
     }
   };
 
@@ -797,7 +794,7 @@ export default function ProductosPage() {
 
       setProducts([...products, newProduct]);
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al duplicar producto");
     }
   };
 
@@ -1130,10 +1127,10 @@ export default function ProductosPage() {
 
       {/* Estadísticas - Responsive */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
-        <div className="rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 p-3 sm:p-4">
+        <div className="rounded-xl bg-primary/5 border border-primary/20 dark:bg-primary/10 dark:border-primary/30 p-3 sm:p-4">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <Package className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             </div>
             <div>
               <p className="text-[10px] sm:text-sm text-muted-foreground">
@@ -1146,30 +1143,26 @@ export default function ProductosPage() {
           </div>
         </div>
 
-        <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 p-3 sm:p-4">
+        <div className="rounded-xl bg-success/5 border border-success/20 dark:bg-success/10 dark:border-success/30 p-3 sm:p-4">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-success/10 dark:bg-success/20 flex items-center justify-center">
+              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-success" />
             </div>
             <div>
               <p className="text-[10px] sm:text-sm text-muted-foreground">
                 Valor
               </p>
               <p className="text-lg sm:text-2xl font-bold text-foreground truncate">
-                {new Intl.NumberFormat("es-AR", {
-                  notation: "compact",
-                  compactDisplay: "short",
-                  maximumFractionDigits: 1,
-                }).format(stats.totalInventoryValue)}
+                {formatCompactNumber(stats.totalInventoryValue)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 p-3 sm:p-4">
+        <div className="rounded-xl bg-warning/5 border border-warning/20 dark:bg-warning/10 dark:border-warning/30 p-3 sm:p-4">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-amber-100 flex items-center justify-center">
-              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-warning/10 dark:bg-warning/20 flex items-center justify-center">
+              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-warning" />
             </div>
             <div>
               <p className="text-[10px] sm:text-sm text-muted-foreground">
@@ -1182,10 +1175,10 @@ export default function ProductosPage() {
           </div>
         </div>
 
-        <div className="rounded-xl bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 p-3 sm:p-4">
+        <div className="rounded-xl bg-destructive/5 border border-destructive/20 dark:bg-destructive/10 dark:border-destructive/30 p-3 sm:p-4">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-rose-100 flex items-center justify-center">
-              <X className="h-4 w-4 sm:h-5 sm:w-5 text-rose-600" />
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-destructive/10 dark:bg-destructive/20 flex items-center justify-center">
+              <X className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
             </div>
             <div>
               <p className="text-[10px] sm:text-sm text-muted-foreground">

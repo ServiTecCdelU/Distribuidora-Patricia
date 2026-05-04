@@ -298,7 +298,7 @@ export function useCart(role: UserRole, userEmail?: string) {
         setSellers(sellersData.filter((s) => s.isActive));
       }
     } catch (error) {
-      // Error silenciado
+
       toast.error("Error al cargar los datos");
     } finally {
       setLoading(false);
@@ -589,7 +589,7 @@ export function useCart(role: UserRole, userEmail?: string) {
       setDniNotFound(false);
       toast.success("Cliente registrado correctamente");
     } catch (error) {
-      // Error silenciado
+
       toast.error("Error al registrar el cliente");
       throw error;
     }
@@ -817,7 +817,7 @@ export function useCart(role: UserRole, userEmail?: string) {
         return "sale";
       }
     } catch (error) {
-      // Error silenciado
+
       toast.error(
         error instanceof Error ? error.message : "Error al procesar la venta",
       );

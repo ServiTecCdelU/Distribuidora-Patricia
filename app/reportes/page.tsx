@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,7 +61,7 @@ export default function ReportesPage() {
         setSellers(sellersData);
       } catch (error) {
         if (!mounted) return;
-        // Error silenciado
+        toast.error("Error al cargar reportes");
       } finally {
         if (mounted) setLoading(false);
       }

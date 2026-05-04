@@ -115,7 +115,6 @@ export default function ClientesPage() {
       setClients(data)
     } catch (error) {
       if (isMounted && !isMounted()) return
-      // Error silenciado
       toast.error('Error al cargar los clientes')
     } finally {
       if (isMounted && !isMounted()) return
@@ -158,7 +157,6 @@ export default function ClientesPage() {
       }
       setModalOpen(false)
     } catch (error) {
-      // Error silenciado
       toast.error('Error al guardar el cliente')
     }
   }

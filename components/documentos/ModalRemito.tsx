@@ -65,7 +65,7 @@ export function ModalRemito({
       toast.success("Remito guardado correctamente");
       onPdfGenerated?.();
     } catch (error: any) {
-      // Error silenciado
+
       toast.error(
         "Error al generar el remito: " + (error.message || "Error desconocido"),
       );

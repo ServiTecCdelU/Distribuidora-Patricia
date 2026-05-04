@@ -186,7 +186,7 @@ export function useVentas(filterBySellerId?: string, clientCityMap?: Record<stri
       })) as Venta[];
       setVentas(ventasData);
     } catch (error) {
-      // Error silenciado
+
       toast.error("Error al cargar ventas");
     } finally {
       setCargando(false);
@@ -324,7 +324,7 @@ export function useVentas(filterBySellerId?: string, clientCityMap?: Record<stri
         setModalDetalleAbierto(true);
       }
     } catch (error) {
-      // Error silenciado
+
     }
   }, []);
 
@@ -352,7 +352,7 @@ export function useVentas(filterBySellerId?: string, clientCityMap?: Record<stri
       const pdfBase64 = await generarPdfCliente(venta, tipo, afipData);
       return pdfBase64;
     } catch (error: any) {
-      // Error silenciado
+
       throw new Error(`Error al generar PDF: ${error.message}`);
     }
   };
@@ -391,7 +391,7 @@ export function useVentas(filterBySellerId?: string, clientCityMap?: Record<stri
               clientAddress = clientData.address || clientAddress;
             }
           } catch (error) {
-            // Error silenciado
+      
           }
         }
 
@@ -508,7 +508,7 @@ export function useVentas(filterBySellerId?: string, clientCityMap?: Record<stri
       await cargarVentas();
       cerrarEmitir();
     } catch (error: any) {
-      // Error silenciado
+
       toast.error(`Error: ${error.message}`, { id: toastId });
     } finally {
       setEmitiendo(false);
@@ -612,7 +612,7 @@ export function useVentas(filterBySellerId?: string, clientCityMap?: Record<stri
       }
       await cargarVentas();
     } catch (error: any) {
-      // Error silenciado
+
       toast.error(`Error: ${error.message}`, { id: toastId });
     } finally {
       setEmitiendo(false);
@@ -742,7 +742,7 @@ export function useVentas(filterBySellerId?: string, clientCityMap?: Record<stri
         duration: 5000,
       });
     } catch (error: any) {
-      // Error silenciado
+
       toast.error("Error: " + error.message);
     }
   }, []);

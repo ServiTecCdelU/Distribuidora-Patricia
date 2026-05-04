@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,7 +75,7 @@ export default function ListasPreciosPage() {
         setProducts(productsData);
       } catch (error) {
         if (!mounted) return;
-        // Error silenciado
+        toast.error("Error al cargar listas de precios");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -92,7 +93,7 @@ export default function ListasPreciosPage() {
       setLists(listsData);
       setProducts(productsData);
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al recargar listas de precios");
     } finally {
       setLoading(false);
     }
@@ -156,7 +157,7 @@ export default function ListasPreciosPage() {
       setShowModal(false);
       loadData();
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al guardar lista de precios");
     } finally {
       setSaving(false);
     }
@@ -176,7 +177,7 @@ export default function ListasPreciosPage() {
       });
       loadData();
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al eliminar lista de precios");
     }
   };
 

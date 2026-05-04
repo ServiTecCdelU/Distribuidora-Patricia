@@ -53,6 +53,7 @@ import type { TransferConfig } from '@/lib/api'
 import { Label } from '@/components/ui/label'
 import type { Product, Client, Order, OrderStatus } from '@/lib/types'
 import { formatCurrency } from '@/lib/utils/format'
+import { toast } from 'sonner'
 
 const statusMeta: Record<OrderStatus, { 
   label: string; 
@@ -206,7 +207,7 @@ export default function DashboardPage() {
       setProductDistribution(data.charts.productDistribution || [])
     } catch (error) {
       if (isMounted && !isMounted()) return
-      // Error silenciado
+      toast.error('Error al cargar el dashboard')
     } finally {
       if (isMounted && !isMounted()) return
       setLoading(false)
@@ -269,7 +270,7 @@ export default function DashboardPage() {
       loadDashboardData()
       setSelectedOrder(null)
     } catch (error) {
-      // Error silenciado
+      toast.error('Error al actualizar estado del pedido')
     }
   }
 
@@ -279,7 +280,7 @@ export default function DashboardPage() {
       await transferApi.saveConfig(aliasConfig)
       setAliasModalOpen(false)
     } catch (error) {
-      // Error silenciado
+      toast.error('Error al guardar configuracion de transferencia')
     } finally {
       setAliasSaving(false)
     }

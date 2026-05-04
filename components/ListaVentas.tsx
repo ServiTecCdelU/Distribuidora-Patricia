@@ -39,6 +39,7 @@ import {
 import Link from "next/link";
 import type { ListaVentasProps } from "../types";
 import { formatDate, formatTime, formatCurrency } from "@/lib/utils/format";
+import { toDate } from "@/services/firestore-helpers";
 import { useMemo, useState, useCallback } from "react";
 import {
   Dialog,
@@ -83,17 +84,11 @@ const periodLabels: Record<string, string> = {
   custom: "Personalizado",
 };
 
-const safeGetDate = (date: any): Date | null => {
+const safeGetDate = (date: unknown): Date | null => {
   if (!date) return null;
   try {
-    let d: Date;
-    if (date?.toDate) d = date.toDate();
-    else if (typeof date === "string") d = new Date(date);
-    else if (typeof date === "number") d = new Date(date);
-    else if (date instanceof Date) d = date;
-    else if (date?.seconds) d = new Date(date.seconds * 1000);
-    else return null;
-    return isNaN(d.getTime()) ? null : d;
+    const d = toDate(date);
+    return isNaN(d.getTime()) || d.getTime() === 0 ? null : d;
   } catch { return null; }
 };
 

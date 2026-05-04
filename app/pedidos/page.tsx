@@ -29,7 +29,7 @@ import { RouteMapModal } from "@/components/pedidos/route-map-modal";
 import { statusConfig, statusFlow } from "@/lib/order-constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency as formatPrice } from "@/lib/utils/format";
+import { formatCurrency as formatPrice, formatDateShort as formatDate, formatDateFull } from "@/lib/utils/format";
 
 export const generateOrderNumber = (date: Date, index: number) => {
   const d = new Date(date);
@@ -37,25 +37,6 @@ export const generateOrderNumber = (date: Date, index: number) => {
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}${month}${day}-${String(index + 1).padStart(4, "0")}`;
-};
-
-export const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
-};
-
-export const formatDateFull = (date: Date) => {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
 };
 
 export const calculateOrderTotal = (order: Order) => {
@@ -145,7 +126,7 @@ export default function PedidosPage() {
       setSellers(sellersData);
     } catch (error) {
       if (isMounted && !isMounted()) return;
-      // Error silenciado
+      toast.error("Error al cargar pedidos");
     } finally {
       if (isMounted && !isMounted()) return;
       setLoading(false);
@@ -203,8 +184,7 @@ export default function PedidosPage() {
       link.download = `remito-${remitoNumber}.pdf`;
       link.click();
     } catch (error) {
-      // Error silenciado
-      alert("Error al generar el remito");
+      toast.error("Error al generar el remito");
     } finally {
       setGeneratingDoc(false);
     }
@@ -307,8 +287,7 @@ export default function PedidosPage() {
       link.download = `boleta-${invoiceNumber}.pdf`;
       link.click();
     } catch (error: any) {
-      // Error silenciado
-      alert(`Error al generar la boleta: ${error.message}`);
+      toast.error(`Error al generar la boleta: ${error.message}`);
     } finally {
       setGeneratingDoc(false);
     }
@@ -320,7 +299,7 @@ export default function PedidosPage() {
       setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
       if (detailOrder?.id === orderId) setDetailOrder(updated);
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al asignar transportista");
     }
   }, [detailOrder]);
 
@@ -330,7 +309,7 @@ export default function PedidosPage() {
       setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
       if (detailOrder?.id === orderId) setDetailOrder(updated);
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al desasignar transportista");
     }
   }, [detailOrder]);
 
@@ -374,7 +353,7 @@ export default function PedidosPage() {
         setDetailOrder(updated);
       }
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al actualizar estado del pedido");
     }
   }, [orders, detailOrder]);
 
@@ -508,8 +487,7 @@ export default function PedidosPage() {
       setCashAmount("");
       setSelectedClientId("");
     } catch (error) {
-      // Error silenciado
-      alert(
+      toast.error(
         error instanceof Error ? error.message : "Error al completar el pedido",
       );
     } finally {
@@ -762,7 +740,7 @@ export default function PedidosPage() {
       setSelectedOrderIds(new Set());
       setBulkTransportistaId("");
     } catch (e) {
-      // Error silenciado
+      toast.error("Error al asignar transportistas en lote");
     } finally {
       setBulkAssigning(false);
     }

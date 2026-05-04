@@ -88,7 +88,7 @@ export function ModalBoleta({
       toast.success("✅ PDF generado y guardado correctamente");
       onPdfGenerated?.();
     } catch (err: any) {
-      // Error silenciado
+
       setError(err.message || "Error desconocido");
       toast.error(
         "Error al generar el PDF: " + (err.message || "Error desconocido"),

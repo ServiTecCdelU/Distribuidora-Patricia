@@ -104,7 +104,7 @@ export default function EmpleadosPage() {
         setSellers(data)
       } catch (error) {
         if (!mounted) return
-        // Error silenciado
+
         toast.error('Error al cargar empleados')
       } finally {
         if (mounted) setLoading(false)
@@ -119,7 +119,6 @@ export default function EmpleadosPage() {
       const data = await sellersApi.getAll()
       setSellers(data)
     } catch (error) {
-      // Error silenciado
       toast.error('Error al cargar empleados')
     } finally {
       setLoading(false)
@@ -169,7 +168,6 @@ export default function EmpleadosPage() {
       const data = await sellersApi.getCommissions(seller.id)
       setCommissions(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
     } catch (error) {
-      // Error silenciado
       toast.error('Error al cargar comisiones')
     } finally {
       setLoadingCommissions(false)
@@ -183,7 +181,6 @@ export default function EmpleadosPage() {
       setSellers(sellers.filter(s => s.id !== sellerToDelete.id))
       toast.success('Empleado eliminado correctamente')
     } catch (error) {
-      // Error silenciado
       toast.error('Error al eliminar empleado')
     } finally {
       setDeleteDialogOpen(false)
@@ -225,7 +222,6 @@ export default function EmpleadosPage() {
       }
       setModalOpen(false)
     } catch (error) {
-      // Error silenciado
       toast.error('Error al guardar empleado')
     } finally {
       setSaving(false)
@@ -243,7 +239,6 @@ export default function EmpleadosPage() {
       }
       toast.success('Comision marcada como pagada')
     } catch (error) {
-      // Error silenciado
       toast.error('Error al pagar comision')
     } finally {
       setPayingCommission(null)
@@ -260,7 +255,6 @@ export default function EmpleadosPage() {
       await loadSellers()
       toast.success('Todas las comisiones fueron pagadas')
     } catch (error) {
-      // Error silenciado
       toast.error('Error al pagar comisiones')
     } finally {
       setPayingAll(false)

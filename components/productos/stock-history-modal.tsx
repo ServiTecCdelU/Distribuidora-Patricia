@@ -26,7 +26,7 @@ import {
   Archive
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatCurrency, formatDateTime as formatDate } from '@/lib/utils/format'
+import { formatCurrency, formatDateTime as formatDate, formatDateShort } from '@/lib/utils/format'
 import type { StockMovement } from '@/app/productos/page'
 
 type FilterType = 'all' | 'sale' | 'manual_add' | 'manual_remove' | 'deactivation'
@@ -72,14 +72,6 @@ export function StockHistoryModal({ open, onOpenChange, product, history }: Stoc
     }
   }, [history, product])
 
-  const formatDateShort = (date: Date) => {
-    return new Intl.DateTimeFormat('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(new Date(date))
-  }
 
   const getMovementIcon = (type: StockMovement['type']) => {
     switch (type) {

@@ -35,6 +35,7 @@ import { collection, doc, setDoc, getDocs, query, where, orderBy, limit, getDoc 
 import { generateReadableId } from "@/services/firestore-helpers";
 import { firestore } from "@/lib/firebase";
 import { formatCurrency, formatTime } from "@/lib/utils/format";
+import { toast } from "sonner";
 
 interface CashRegister {
   id: string;
@@ -112,7 +113,7 @@ export default function CajaPage() {
         setSales(todaySales);
       } catch (error) {
         if (!mounted) return;
-        // Error silenciado
+        toast.error("Error al cargar datos de caja");
       } finally {
         if (!mounted) return;
         setLoading(false);
@@ -163,7 +164,7 @@ export default function CajaPage() {
       });
       setSales(todaySales);
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al recargar ventas");
     } finally {
       setLoading(false);
     }
@@ -218,7 +219,7 @@ export default function CajaPage() {
       setShowOpenModal(false);
       setInitialAmount("");
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al abrir la caja");
     } finally {
       setSaving(false);
     }
@@ -269,7 +270,7 @@ export default function CajaPage() {
       setFinalAmount("");
       setCloseNotes("");
     } catch (error) {
-      // Error silenciado
+      toast.error("Error al cerrar la caja");
     } finally {
       setSaving(false);
     }

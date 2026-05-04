@@ -47,6 +47,7 @@ import { RouteMapModal } from "@/components/pedidos/route-map-modal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { formatCurrency as formatPrice } from "@/lib/utils/format";
+import { toast } from "sonner";
 
 const calcTotal = (order: Order) =>
   order.items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -820,7 +821,7 @@ export default function TransportePage() {
       setSellers(sellersData);
     } catch (err) {
       if (isMounted && !isMounted()) return;
-      // Error silenciado
+      toast.error("Error al cargar datos de transporte");
     } finally {
       if (isMounted && !isMounted()) return;
       setLoading(false);
@@ -898,7 +899,7 @@ export default function TransportePage() {
       const updated = await ordersApi.updateStatus(orderId, "delivery");
       setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
     } catch (err) {
-      // Error silenciado
+      toast.error("Error al marcar como en camino");
     }
   }, []);
 
@@ -913,7 +914,7 @@ export default function TransportePage() {
         );
         setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
       } catch (err) {
-        // Error silenciado
+        toast.error("Error al asignar transportista");
       }
     },
     [user]
@@ -941,7 +942,7 @@ export default function TransportePage() {
       const updated = await ordersApi.removeTransportista(orderId);
       setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
     } catch (err) {
-      // Error silenciado
+      toast.error("Error al desasignar transportista");
     }
   }, []);
 

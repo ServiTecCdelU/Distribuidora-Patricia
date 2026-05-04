@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatPrice } from "@/lib/utils/format";
+import { formatPrice, formatDateFull } from "@/lib/utils/format";
 import type { Order, OrderStatus, Seller } from "@/lib/types";
 import {
   X,
@@ -49,15 +49,6 @@ const generateOrderNumber = (createdAt: Date | string) => {
   return `${year}${month}${day}`;
 };
 
-const formatDateFull = (date: Date | string) => {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
-};
 
 const calculateOrderTotal = (order: Order) => {
   const itemsTotal = order.items.reduce((acc, item) => {
