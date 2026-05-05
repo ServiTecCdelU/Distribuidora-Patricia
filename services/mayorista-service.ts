@@ -16,6 +16,14 @@ import { createProduct, updateProduct } from "@/services/products-service";
 const COL = "mayorista_productos";
 const PREFS_COL = "configuracion";
 
+// ─── Caché en memoria ─────────────────────────────────────────────────────────
+// Evita re-leer 8.000 docs en cada visita a la página (cuota: 50K reads/día).
+// Se invalida tras importar o cuando el usuario fuerza recarga.
+let _cache: { data: MayoristaProducto[]; ts: number } | null = null;
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutos
+
+export const invalidateMayoristaCache = () => { _cache = null; };
+
 function mapDoc(id: string, data: Record<string, unknown>): MayoristaProducto {
   return {
     id,
@@ -38,15 +46,20 @@ function mapDoc(id: string, data: Record<string, unknown>): MayoristaProducto {
   };
 }
 
-export const getMayoristaProductos = async (): Promise<MayoristaProducto[]> => {
+export const getMayoristaProductos = async (forceRefresh = false): Promise<MayoristaProducto[]> => {
+  if (!forceRefresh && _cache && Date.now() - _cache.ts < CACHE_TTL) {
+    return _cache.data;
+  }
   const snap = await getDocs(collection(firestore, COL));
-  return snap.docs
+  const data = snap.docs
     .map((d) => mapDoc(d.id, d.data() as Record<string, unknown>))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  _cache = { data, ts: Date.now() };
+  return data;
 };
 
-// Batch size conservador para no saturar el rate limit de Firestore
-const BATCH_SIZE = 200;
+const BATCH_SIZE = 300;
+const PARALLEL_BATCHES = 2; // 2 x 300 = 600 writes concurrentes, dentro del límite
 
 export const upsertMayoristaProductos = async (
   productos: Omit<MayoristaProducto, "id" | "updatedAt" | "stockLocal" | "precioVenta" | "gananciaGlobal" | "habilitado" | "lote" | "seDivideEn" | "productoId">[],
@@ -110,6 +123,7 @@ export const upsertMayoristaProductos = async (
     onProgress?.(Math.round((done / toWrite.length) * productos.length), productos.length);
   }
   onProgress?.(productos.length, productos.length);
+  invalidateMayoristaCache();
 };
 
 export const updateMayoristaProducto = async (
@@ -135,19 +149,24 @@ export const applyGananciaToProducts = async (
   }
 
   let done = 0;
-  for (const chunk of chunks) {
-    const batch = writeBatch(firestore);
-    chunk.forEach(({ id, precioUnitarioMayorista }) => {
-      const precioVenta = Math.round(precioUnitarioMayorista * (1 + porcentaje / 100) * 100) / 100;
-      batch.update(doc(firestore, COL, id), {
-        precioVenta,
-        gananciaGlobal: porcentaje,
-        updatedAt: serverTimestamp(),
-      });
-    });
-    await batch.commit();
-    done += chunk.length;
-    onProgress?.(done, products.length);
+  for (let i = 0; i < chunks.length; i += PARALLEL_BATCHES) {
+    const group = chunks.slice(i, i + PARALLEL_BATCHES);
+    await Promise.all(
+      group.map(async (chunk) => {
+        const batch = writeBatch(firestore);
+        chunk.forEach(({ id, precioUnitarioMayorista }) => {
+          const precioVenta = Math.round(precioUnitarioMayorista * (1 + porcentaje / 100) * 100) / 100;
+          batch.update(doc(firestore, COL, id), {
+            precioVenta,
+            gananciaGlobal: porcentaje,
+            updatedAt: serverTimestamp(),
+          });
+        });
+        await batch.commit();
+        done += chunk.length;
+        onProgress?.(done, products.length);
+      })
+    );
   }
 };
 

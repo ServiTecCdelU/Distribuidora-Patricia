@@ -53,6 +53,7 @@ import {
   deshabilitarProducto,
   getMayoristaPrefs,
   saveMayoristaPrefs,
+  invalidateMayoristaCache,
 } from "@/services/mayorista-service";
 import { formatCurrency } from "@/lib/utils/format";
 import { useAuth } from "@/hooks/use-auth";
@@ -125,9 +126,9 @@ export default function MayoristaPage() {
   });
   const [prefsLoaded, setPrefsLoaded] = useState(false);
 
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async (forceRefresh = false) => {
     try {
-      const data = await getMayoristaProductos();
+      const data = await getMayoristaProductos(forceRefresh);
       setProductos(data);
     } catch {
       toast.error("Error al cargar productos del mayorista");
@@ -226,7 +227,7 @@ export default function MayoristaPage() {
               productos={productos}
               loading={loading}
               prefs={prefs}
-              onReload={cargar}
+              onReload={() => { invalidateMayoristaCache(); cargar(true); }}
               onProductosImportados={(nuevos) => setProductos(nuevos)}
               onHabilitarChange={(id, changes) =>
                 setProductos((prev) =>
@@ -573,7 +574,8 @@ function ListaPrecios({
         open={importOpen}
         onOpenChange={setImportOpen}
         onImportado={async () => {
-          const actualizados = await getMayoristaProductos();
+          // La caché ya fue invalidada por upsertMayoristaProductos
+          const actualizados = await getMayoristaProductos(true);
           onProductosImportados(actualizados);
           setImportOpen(false);
           toast.success(`${actualizados.length} productos importados`);
