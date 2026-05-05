@@ -1011,27 +1011,30 @@ function ExcelImportDialog({
               ))}
             </div>
 
-            {/* Preview compacto solo primeras 3 cols */}
+            {/* Preview del archivo */}
             <div className="rounded-xl border overflow-hidden text-xs">
-              <p className="bg-muted/50 px-3 py-1.5 font-medium text-muted-foreground border-b text-xs">
-                Vista previa del archivo (primeras 3 filas)
+              <p className="bg-muted/50 px-3 py-1.5 font-medium text-muted-foreground border-b">
+                Vista previa — fila encabezado + primeras 5 filas de datos
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr>
+                    <tr className="bg-teal-50/50 dark:bg-teal-950/20">
                       {columns.slice(0, 8).map((col) => (
-                        <th key={col.letter} className="px-2 py-1 text-left font-mono text-teal-600 bg-muted/20 border-r last:border-r-0 text-xs whitespace-nowrap">
-                          {col.letter}
+                        <th key={col.letter} className="px-2 py-1.5 text-left border-r last:border-r-0 whitespace-nowrap">
+                          <span className="font-mono font-bold text-teal-600">{col.letter}</span>
+                          {col.header && (
+                            <span className="block text-muted-foreground font-normal truncate max-w-[80px]">{col.header}</span>
+                          )}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {rawRows.slice(0, 3).map((row, ri) => (
-                      <tr key={ri} className="border-t">
+                    {rawRows.slice(1, 6).map((row, ri) => (
+                      <tr key={ri} className="border-t hover:bg-muted/20">
                         {(row as unknown[]).slice(0, 8).map((cell, ci) => (
-                          <td key={ci} className="px-2 py-1 border-r last:border-r-0 max-w-[90px] truncate text-xs">
+                          <td key={ci} className="px-2 py-1 border-r last:border-r-0 max-w-[90px] truncate">
                             {cellToString(cell)}
                           </td>
                         ))}
