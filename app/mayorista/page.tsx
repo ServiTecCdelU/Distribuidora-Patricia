@@ -73,7 +73,6 @@ interface ColumnMapping {
   precioUnitario: ColumnLetter;
   rubro: ColumnLetter;
   subrubro: ColumnLetter;
-  unidadesPorBulto: ColumnLetter;
 }
 
 interface ParsedRow {
@@ -229,11 +228,6 @@ export default function MayoristaPage() {
               prefs={prefs}
               onReload={cargar}
               onProductosImportados={(nuevos) => setProductos(nuevos)}
-              onCategoriaChange={(id, cat) =>
-                setProductos((prev) =>
-                  prev.map((p) => (p.id === id ? { ...p, categoria: cat } : p))
-                )
-              }
               onHabilitarChange={(id, changes) =>
                 setProductos((prev) =>
                   prev.map((p) => (p.id === id ? { ...p, ...changes } : p))
@@ -276,7 +270,6 @@ function ListaPrecios({
   prefs,
   onReload,
   onProductosImportados,
-  onCategoriaChange,
   onHabilitarChange,
 }: {
   productos: MayoristaProducto[];
@@ -284,7 +277,6 @@ function ListaPrecios({
   prefs: MayoristaPrefs;
   onReload: () => void;
   onProductosImportados: (nuevos: MayoristaProducto[]) => void;
-  onCategoriaChange: (id: string, cat: string) => void;
   onHabilitarChange: (id: string, changes: Partial<MayoristaProducto>) => void;
 }) {
   const PAGE_SIZE = 100;
@@ -293,8 +285,6 @@ function ListaPrecios({
   const [subrubroFiltro, setSubrubroFiltro] = useState("todos");
   const [currentPage, setCurrentPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
-  const [editingCategoria, setEditingCategoria] = useState<string | null>(null);
-  const [categoriaInput, setCategoriaInput] = useState("");
   const [habilitarTarget, setHabilitarTarget] = useState<MayoristaProducto | null>(null);
 
   // Reset página cuando cambian filtros
@@ -341,18 +331,7 @@ function ListaPrecios({
     ? filtrados
     : filtrados.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const guardarCategoria = async (id: string) => {
-    const cat = categoriaInput.trim();
-    if (!cat) return;
-    try {
-      await updateMayoristaProducto(id, { categoria: cat });
-      onCategoriaChange(id, cat);
-      setEditingCategoria(null);
-      toast.success("Categoría actualizada");
-    } catch {
-      toast.error("Error al guardar la categoría");
-    }
-  };
+
 
   return (
     <div className="space-y-4">
@@ -460,7 +439,6 @@ function ListaPrecios({
                       <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Subrubro 3</th>
                     </>
                   )}
-                  <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Categoría</th>
                   <th className="text-center px-3 py-3 font-semibold text-muted-foreground">Estado</th>
                 </tr>
               </thead>
@@ -502,51 +480,6 @@ function ListaPrecios({
                           </td>
                         </>
                       )}
-                      <td className="px-3 py-2.5">
-                        {editingCategoria === p.id ? (
-                          <div className="flex items-center gap-1">
-                            <Input
-                              value={categoriaInput}
-                              onChange={(e) => setCategoriaInput(e.target.value)}
-                              className="h-7 text-xs rounded-lg w-28"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") guardarCategoria(p.id);
-                                if (e.key === "Escape") setEditingCategoria(null);
-                              }}
-                            />
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              onClick={() => guardarCategoria(p.id)}
-                            >
-                              <Check className="h-3.5 w-3.5 text-green-600" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              onClick={() => setEditingCategoria(null)}
-                            >
-                              <X className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <button
-                            className="flex items-center gap-1.5 group"
-                            onClick={() => {
-                              setEditingCategoria(p.id);
-                              setCategoriaInput(p.categoria);
-                            }}
-                          >
-                            <Badge variant="secondary" className="text-xs font-normal">
-                              {p.categoria || "Sin categoría"}
-                            </Badge>
-                            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </button>
-                        )}
-                      </td>
                       <td className="px-3 py-2.5 text-center">
                         {p.habilitado ? (
                           <Button
@@ -803,8 +736,8 @@ function ExcelImportDialog({
     precioUnitario: "D",
     rubro: "E",
     subrubro: "F",
-    unidadesPorBulto: "H",
   });
+  const [headerRowIndex, setHeaderRowIndex] = useState(0);
   const [parsed, setParsed] = useState<ParsedRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -813,6 +746,7 @@ function ExcelImportDialog({
     setStep("upload");
     setColumns([]);
     setRawRows([]);
+    setHeaderRowIndex(0);
     setParsed([]);
     setSaving(false);
     setProgress({ done: 0, total: 0 });
@@ -843,17 +777,32 @@ function ExcelImportDialog({
           return;
         }
 
-        const maxCols = Math.max(...rows.slice(0, 3).map((r) => (r as unknown[]).length));
+        // Auto-detectar fila de encabezados: primera fila con 4+ celdas de texto no numérico
+        let detectedHeader = 0;
+        for (let ri = 0; ri < Math.min(rows.length, 6); ri++) {
+          const row = rows[ri] as unknown[];
+          const textCells = row.filter((cell) => {
+            const s = cellToString(cell);
+            return s.length > 0 && isNaN(Number(s));
+          });
+          if (textCells.length >= 4) {
+            detectedHeader = ri;
+            break;
+          }
+        }
+
+        const maxCols = Math.max(...rows.slice(detectedHeader, detectedHeader + 3).map((r) => (r as unknown[]).length));
         const cols: ExcelColumn[] = [];
         for (let i = 0; i < maxCols; i++) {
           const letter = colIndexToLetter(i);
-          const header = cellToString((rows[0] as unknown[])[i]);
+          const header = cellToString((rows[detectedHeader] as unknown[])[i]);
           const preview = rows
-            .slice(1, 4)
+            .slice(detectedHeader + 1, detectedHeader + 4)
             .map((r) => cellToString((r as unknown[])[i]));
           cols.push({ letter, header, preview });
         }
 
+        setHeaderRowIndex(detectedHeader);
         setColumns(cols);
         setRawRows(rows);
         setStep("mapping");
@@ -873,7 +822,7 @@ function ExcelImportDialog({
       return index - 1;
     };
 
-    const rows = rawRows.slice(1);
+    const rows = rawRows.slice(headerRowIndex + 1);
     const result: ParsedRow[] = rows
       .map((row) => {
         const r = row as unknown[];
@@ -885,7 +834,7 @@ function ExcelImportDialog({
           precioUnitarioMayorista: cellToNumber(r[letterToIndex(mapping.precioUnitario)]),
           rubro,
           subrubro: cellToString(r[letterToIndex(mapping.subrubro)]),
-          unidadesPorBulto: cellToNumber(r[letterToIndex(mapping.unidadesPorBulto)]) || 1,
+          unidadesPorBulto: 1,
           // Categoría = rubro (son lo mismo)
           categoria: rubro || "Sin categoría",
         };
@@ -921,9 +870,8 @@ function ExcelImportDialog({
     { key: "codigo", label: "Código (col B)" },
     { key: "nombre", label: "Descripción / Nombre (col C)" },
     { key: "precioUnitario", label: "Precio Cons. Final (col D)" },
-    { key: "rubro", label: "Rubro / Categoría (col E)" },
+    { key: "rubro", label: "Rubro (col E)" },
     { key: "subrubro", label: "Subrubro (col F)" },
-    { key: "unidadesPorBulto", label: "Unidades por bulto" },
   ];
 
   return (
@@ -1031,7 +979,7 @@ function ExcelImportDialog({
                     </tr>
                   </thead>
                   <tbody>
-                    {rawRows.slice(1, 6).map((row, ri) => (
+                    {rawRows.slice(headerRowIndex + 1, headerRowIndex + 6).map((row, ri) => (
                       <tr key={ri} className="border-t hover:bg-muted/20">
                         {(row as unknown[]).slice(0, 8).map((cell, ci) => (
                           <td key={ci} className="px-2 py-1 border-r last:border-r-0 max-w-[90px] truncate">
