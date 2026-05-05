@@ -19,32 +19,67 @@ import { toDate, generateReadableId } from "@/services/firestore-helpers";
 
 const PRODUCTS_COLLECTION = "productos";
 
-export const getProducts = async (): Promise<Product[]> => {
-  const snapshot = await getDocs(collection(firestore, PRODUCTS_COLLECTION))
+// ─── Caché en localStorage (30 min) ──────────────────────────────────────────
+const PROD_CACHE_KEY = "products_cache_v1";
+const PROD_CACHE_TTL = 30 * 60 * 1000; // 30 minutos
 
-  return snapshot.docs
-    .map((docSnap) => {
-      const data = docSnap.data()
+let _prodMemCache: { data: Product[]; ts: number } | null = null;
 
-      return {
-        id: docSnap.id,
-        name: data.name,
-        description: data.description,
-        price: data.price,
-        stock: data.stock,
-        imageUrl: data.imageUrl,
-        category: data.category,
+function readProductsCache(): { data: Product[]; ts: number } | null {
+  if (_prodMemCache) return _prodMemCache;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(PROD_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { data: Product[]; ts: number };
+    if (!parsed?.ts || !Array.isArray(parsed.data)) return null;
+    _prodMemCache = parsed;
+    return _prodMemCache;
+  } catch { return null; }
+}
 
-        // 👇 ESTO ES LO NUEVO
-        base: data.base ?? 'crema',
-        marca: data.marca ?? 'Sin identificar',
-        sinTacc: data.sinTacc ?? false,
-        disabled: data.disabled ?? false,
+function writeProductsCache(data: Product[]): void {
+  _prodMemCache = { data, ts: Date.now() };
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(PROD_CACHE_KEY, JSON.stringify(_prodMemCache)); } catch { /* noop */ }
+}
 
-        createdAt: toDate(data.createdAt),
-      }
-    })
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+export function invalidateProductsCache(): void {
+  _prodMemCache = null;
+  if (typeof window !== "undefined") {
+    try { localStorage.removeItem(PROD_CACHE_KEY); } catch { /* noop */ }
+  }
+}
+
+function mapProduct(docSnap: { id: string; data: () => Record<string, unknown> }): Product {
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    name: data.name as string,
+    description: data.description as string,
+    price: data.price as number,
+    stock: data.stock as number,
+    imageUrl: data.imageUrl as string,
+    category: data.category as string,
+    base: (data.base as string) ?? 'crema',
+    marca: (data.marca as string) ?? 'Sin identificar',
+    sinTacc: (data.sinTacc as boolean) ?? false,
+    disabled: (data.disabled as boolean) ?? false,
+    createdAt: toDate(data.createdAt),
+  };
+}
+
+export const getProducts = async (forceRefresh = false): Promise<Product[]> => {
+  if (!forceRefresh) {
+    const cached = readProductsCache();
+    if (cached && Date.now() - cached.ts < PROD_CACHE_TTL) return cached.data;
+  }
+  const snapshot = await getDocs(collection(firestore, PRODUCTS_COLLECTION));
+  const data = snapshot.docs
+    .map((d) => mapProduct(d as any))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  writeProductsCache(data);
+  return data;
 }
 
 
@@ -83,7 +118,7 @@ export const createProduct = async (
     disabled: product.disabled ?? false,
     createdAt: serverTimestamp(),
   });
-
+  invalidateProductsCache();
   return {
     ...product,
     id: docId,
@@ -96,18 +131,23 @@ export const updateProduct = async (
   id: string,
   updates: Partial<Product>
 ): Promise<Product> => {
-  await updateDoc(doc(firestore, PRODUCTS_COLLECTION, id), {
-    ...updates,
-  });
-
-  const updated = await getProductById(id);
-  if (!updated) throw new Error("Product not found");
-
-  return updated;
+  await updateDoc(doc(firestore, PRODUCTS_COLLECTION, id), { ...updates });
+  invalidateProductsCache();
+  // Actualizar caché local en lugar de releer Firestore
+  const cached = readProductsCache();
+  if (cached) {
+    const updated = cached.data.map(p => p.id === id ? { ...p, ...updates } : p);
+    writeProductsCache(updated);
+    return updated.find(p => p.id === id) ?? { id, ...updates } as Product;
+  }
+  const fresh = await getProductById(id);
+  if (!fresh) throw new Error("Product not found");
+  return fresh;
 };
 
 export const deleteProduct = async (id: string): Promise<void> => {
   await deleteDoc(doc(firestore, PRODUCTS_COLLECTION, id));
+  invalidateProductsCache();
 };
 
 export const getProductsPaginated = async (
