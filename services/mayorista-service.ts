@@ -16,13 +16,45 @@ import { createProduct, updateProduct } from "@/services/products-service";
 const COL = "mayorista_productos";
 const PREFS_COL = "configuracion";
 
-// ─── Caché en memoria ─────────────────────────────────────────────────────────
-// Evita re-leer 8.000 docs en cada visita a la página (cuota: 50K reads/día).
-// Se invalida tras importar o cuando el usuario fuerza recarga.
-let _cache: { data: MayoristaProducto[]; ts: number } | null = null;
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutos
+// ─── Caché persistente (localStorage + memoria) ───────────────────────────────
+// Persiste entre recargas de página para no gastar lecturas de Firestore (50K/día).
+// TTL de 2 horas. Se invalida manualmente tras importar o forzar recarga.
+const CACHE_KEY = "mayorista_cache_v1";
+const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 horas
 
-export const invalidateMayoristaCache = () => { _cache = null; };
+let _memCache: { data: MayoristaProducto[]; ts: number } | null = null;
+
+function readCache(): { data: MayoristaProducto[]; ts: number } | null {
+  if (_memCache) return _memCache;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { data: MayoristaProducto[]; ts: number };
+    if (!parsed?.ts || !Array.isArray(parsed.data)) return null;
+    _memCache = parsed;
+    return _memCache;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(data: MayoristaProducto[]): void {
+  _memCache = { data, ts: Date.now() };
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(_memCache));
+  } catch {
+    // localStorage puede estar lleno — el caché en memoria sigue activo
+  }
+}
+
+export const invalidateMayoristaCache = () => {
+  _memCache = null;
+  if (typeof window !== "undefined") {
+    try { localStorage.removeItem(CACHE_KEY); } catch { /* noop */ }
+  }
+};
 
 function mapDoc(id: string, data: Record<string, unknown>): MayoristaProducto {
   return {
@@ -47,14 +79,17 @@ function mapDoc(id: string, data: Record<string, unknown>): MayoristaProducto {
 }
 
 export const getMayoristaProductos = async (forceRefresh = false): Promise<MayoristaProducto[]> => {
-  if (!forceRefresh && _cache && Date.now() - _cache.ts < CACHE_TTL) {
-    return _cache.data;
+  if (!forceRefresh) {
+    const cached = readCache();
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      return cached.data;
+    }
   }
   const snap = await getDocs(collection(firestore, COL));
   const data = snap.docs
     .map((d) => mapDoc(d.id, d.data() as Record<string, unknown>))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-  _cache = { data, ts: Date.now() };
+  writeCache(data);
   return data;
 };
 
@@ -123,7 +158,30 @@ export const upsertMayoristaProductos = async (
     onProgress?.(Math.round((done / toWrite.length) * productos.length), productos.length);
   }
   onProgress?.(productos.length, productos.length);
-  invalidateMayoristaCache();
+
+  // Reconstruir el caché con los datos que ya tenemos en memoria,
+  // aplicando los cambios escritos. Evita una lectura extra de Firestore.
+  const updatedMap = new Map(existingMap);
+  for (const p of toWrite) {
+    const id = `mp_${p.codigo.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const existing = existingMap.get(id) ?? {};
+    updatedMap.set(id, {
+      ...existing,
+      codigoBarras: p.codigoBarras ?? "",
+      codigo: p.codigo,
+      nombre: p.nombre,
+      precioUnitarioMayorista: p.precioUnitarioMayorista,
+      rubro: p.rubro ?? "",
+      subrubro: p.subrubro ?? "",
+      unidadesPorBulto: p.unidadesPorBulto,
+      categoria: p.categoria,
+      updatedAt: new Date(),
+    });
+  }
+  const updatedData = Array.from(updatedMap.entries())
+    .map(([id, data]) => mapDoc(id, data))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  writeCache(updatedData);
 };
 
 export const updateMayoristaProducto = async (
@@ -167,6 +225,21 @@ export const applyGananciaToProducts = async (
         onProgress?.(done, products.length);
       })
     );
+  }
+
+  // Actualizar caché local con los nuevos precios de venta (sin leer Firestore)
+  const cached = readCache();
+  if (cached) {
+    const updateMap = new Map(products.map((p) => [p.id, p.precioUnitarioMayorista]));
+    const updated = cached.data.map((p) => {
+      if (!updateMap.has(p.id)) return p;
+      return {
+        ...p,
+        precioVenta: Math.round(updateMap.get(p.id)! * (1 + porcentaje / 100) * 100) / 100,
+        gananciaGlobal: porcentaje,
+      };
+    });
+    writeCache(updated);
   }
 };
 
