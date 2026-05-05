@@ -11,9 +11,9 @@ import {
 import { firestore } from "@/lib/firebase";
 import type { MayoristaProducto, MayoristaPrefs } from "@/lib/types";
 import { toDate } from "@/services/firestore-helpers";
-import { createProduct, updateProduct } from "@/services/products-service";
 
 const COL = "mayorista_productos";
+const PRODUCTS_COLLECTION = "productos";
 const PREFS_COL = "configuracion";
 
 // ─── Caché persistente (localStorage + memoria) ───────────────────────────────
@@ -267,20 +267,24 @@ export const habilitarProducto = async (
   let productoId = mp.productoId;
 
   if (productoId) {
-    await updateProduct(productoId, { stock, price: precio });
+    // Solo actualizar stock y precio — sin releer el doc después
+    await updateDoc(doc(firestore, PRODUCTS_COLLECTION, productoId), {
+      stock,
+      price: precio,
+    });
   } else {
-    const created = await createProduct({
+    // ID determinístico basado en el código del mayorista, sin loop de lecturas
+    productoId = `prod_${mp.id}`;
+    await setDoc(doc(firestore, PRODUCTS_COLLECTION, productoId), {
       name: mp.nombre,
       description: mp.codigo,
       price: precio,
       stock,
       imageUrl: "",
       category: mp.rubro || mp.categoria || "Sin categoría",
-      codigo: mp.codigo,
-      unidadesPorBulto: seDivideEn,
-      stockLocal: stock,
+      disabled: false,
+      createdAt: serverTimestamp(),
     });
-    productoId = created.id;
   }
 
   await updateDoc(doc(firestore, COL, mp.id), {
@@ -288,6 +292,7 @@ export const habilitarProducto = async (
     lote,
     seDivideEn,
     productoId,
+    precioVenta: precio,
     updatedAt: serverTimestamp(),
   });
 };
