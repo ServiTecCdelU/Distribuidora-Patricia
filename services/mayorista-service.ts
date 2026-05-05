@@ -45,43 +45,51 @@ export const getMayoristaProductos = async (): Promise<MayoristaProducto[]> => {
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 };
 
-export const upsertMayoristaProductos = async (
-  productos: Omit<MayoristaProducto, "id" | "updatedAt" | "stockLocal" | "precioVenta" | "gananciaGlobal" | "habilitado" | "lote" | "seDivideEn" | "productoId">[]
-): Promise<void> => {
-  // Leer existentes para preservar campos que no vienen del Excel
-  const snap = await getDocs(collection(firestore, COL));
-  const existing = new Map<string, Record<string, unknown>>();
-  snap.docs.forEach((d) => existing.set(d.id, d.data() as Record<string, unknown>));
+// Batch size bien por debajo del límite de Firestore (500)
+const BATCH_SIZE = 450;
+const PARALLEL_BATCHES = 4;
 
-  const batch = writeBatch(firestore);
-  for (const p of productos) {
-    const id = `mp_${p.codigo.replace(/[^a-zA-Z0-9]/g, "_")}`;
-    const prev = existing.get(id);
-    batch.set(
-      doc(firestore, COL, id),
-      {
-        codigoBarras: p.codigoBarras ?? "",
-        codigo: p.codigo,
-        nombre: p.nombre,
-        precioUnitarioMayorista: p.precioUnitarioMayorista,
-        rubro: p.rubro ?? "",
-        subrubro: p.subrubro ?? "",
-        unidadesPorBulto: p.unidadesPorBulto,
-        categoria: p.categoria,
-        // Preservar campos que no vienen del Excel
-        precioVenta: prev?.precioVenta ?? 0,
-        gananciaGlobal: prev?.gananciaGlobal ?? null,
-        stockLocal: prev?.stockLocal ?? 0,
-        habilitado: prev?.habilitado ?? false,
-        lote: prev?.lote ?? null,
-        seDivideEn: prev?.seDivideEn ?? null,
-        productoId: prev?.productoId ?? null,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: false }
+export const upsertMayoristaProductos = async (
+  productos: Omit<MayoristaProducto, "id" | "updatedAt" | "stockLocal" | "precioVenta" | "gananciaGlobal" | "habilitado" | "lote" | "seDivideEn" | "productoId">[],
+  onProgress?: (done: number, total: number) => void
+): Promise<void> => {
+  // Sin pre-lectura: merge:true preserva los campos que no se incluyen en el set
+  const chunks: typeof productos[] = [];
+  for (let i = 0; i < productos.length; i += BATCH_SIZE) {
+    chunks.push(productos.slice(i, i + BATCH_SIZE));
+  }
+
+  let done = 0;
+
+  for (let i = 0; i < chunks.length; i += PARALLEL_BATCHES) {
+    const group = chunks.slice(i, i + PARALLEL_BATCHES);
+    await Promise.all(
+      group.map(async (chunk) => {
+        const batch = writeBatch(firestore);
+        for (const p of chunk) {
+          const id = `mp_${p.codigo.replace(/[^a-zA-Z0-9]/g, "_")}`;
+          batch.set(
+            doc(firestore, COL, id),
+            {
+              codigoBarras: p.codigoBarras ?? "",
+              codigo: p.codigo,
+              nombre: p.nombre,
+              precioUnitarioMayorista: p.precioUnitarioMayorista,
+              rubro: p.rubro ?? "",
+              subrubro: p.subrubro ?? "",
+              unidadesPorBulto: p.unidadesPorBulto,
+              categoria: p.categoria,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true } // preserva precioVenta, habilitado, lote, etc.
+          );
+        }
+        await batch.commit();
+        done += chunk.length;
+        onProgress?.(done, productos.length);
+      })
     );
   }
-  await batch.commit();
 };
 
 export const updateMayoristaProducto = async (

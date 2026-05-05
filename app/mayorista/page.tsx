@@ -766,6 +766,7 @@ function ExcelImportDialog({
   });
   const [parsed, setParsed] = useState<ParsedRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   const reset = () => {
     setStep("upload");
@@ -773,6 +774,7 @@ function ExcelImportDialog({
     setRawRows([]);
     setParsed([]);
     setSaving(false);
+    setProgress({ done: 0, total: 0 });
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -858,8 +860,11 @@ function ExcelImportDialog({
 
   const confirmar = async () => {
     setSaving(true);
+    setProgress({ done: 0, total: parsed.length });
     try {
-      await upsertMayoristaProductos(parsed);
+      await upsertMayoristaProductos(parsed, (done, total) =>
+        setProgress({ done, total })
+      );
       await onImportado();
     } catch {
       toast.error("Error al importar los productos");
@@ -1050,6 +1055,23 @@ function ExcelImportDialog({
               </div>
             </div>
 
+            {saving && progress.total > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Guardando en Firestore...</span>
+                  <span className="font-medium tabular-nums">
+                    {progress.done} / {progress.total}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-teal-500 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between gap-2">
               <Button
                 variant="outline"
@@ -1067,7 +1089,9 @@ function ExcelImportDialog({
                 {saving ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    Importando...
+                    {progress.total > 0
+                      ? `${Math.round((progress.done / progress.total) * 100)}%`
+                      : "Preparando..."}
                   </>
                 ) : (
                   <>
