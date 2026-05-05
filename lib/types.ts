@@ -198,15 +198,29 @@ export interface PriceList {
 
 export interface MayoristaProducto {
   id: string;
+  codigoBarras?: string;
   codigo: string;
   nombre: string;
   precioUnitarioMayorista: number;
+  rubro?: string;
+  subrubro?: string;
   unidadesPorBulto: number;
   categoria: string;
   precioVenta: number;
   gananciaGlobal?: number;
   stockLocal: number;
+  // Habilitar en productos
+  habilitado?: boolean;
+  lote?: number;
+  seDivideEn?: number;
+  productoId?: string;
   updatedAt: Date;
+}
+
+export interface MayoristaPrefs {
+  showCodigoBarras: boolean;
+  showRubro: boolean;
+  showSubrubro: boolean;
 }
 
 export interface StockMovimiento {

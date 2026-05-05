@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -20,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,16 +38,24 @@ import {
   ArrowRight,
   RefreshCw,
   AlertCircle,
+  PackagePlus,
+  PackageX,
+  Settings2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import type { MayoristaProducto } from "@/lib/types";
+import type { MayoristaProducto, MayoristaPrefs } from "@/lib/types";
 import {
   getMayoristaProductos,
   upsertMayoristaProductos,
   updateMayoristaProducto,
   applyGananciaGlobal,
+  habilitarProducto,
+  deshabilitarProducto,
+  getMayoristaPrefs,
+  saveMayoristaPrefs,
 } from "@/services/mayorista-service";
 import { formatCurrency } from "@/lib/utils/format";
+import { useAuth } from "@/hooks/use-auth";
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 type ColumnLetter = string;
@@ -56,17 +67,23 @@ interface ExcelColumn {
 }
 
 interface ColumnMapping {
+  codigoBarras: ColumnLetter;
   codigo: ColumnLetter;
   nombre: ColumnLetter;
   precioUnitario: ColumnLetter;
+  rubro: ColumnLetter;
+  subrubro: ColumnLetter;
   unidadesPorBulto: ColumnLetter;
   categoria: ColumnLetter;
 }
 
 interface ParsedRow {
+  codigoBarras: string;
   codigo: string;
   nombre: string;
   precioUnitarioMayorista: number;
+  rubro: string;
+  subrubro: string;
   unidadesPorBulto: number;
   categoria: string;
 }
@@ -93,10 +110,22 @@ function cellToNumber(val: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
+function getSubrubros(subrubro: string): [string, string, string] {
+  const parts = subrubro.split("/").map((s) => s.trim());
+  return [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""];
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function MayoristaPage() {
+  const { user } = useAuth();
   const [productos, setProductos] = useState<MayoristaProducto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [prefs, setPrefs] = useState<MayoristaPrefs>({
+    showCodigoBarras: true,
+    showRubro: true,
+    showSubrubro: true,
+  });
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -113,10 +142,81 @@ export default function MayoristaPage() {
     cargar();
   }, [cargar]);
 
+  useEffect(() => {
+    if (!user) return;
+    getMayoristaPrefs(user.id)
+      .then((p) => {
+        setPrefs(p);
+        setPrefsLoaded(true);
+      })
+      .catch(() => setPrefsLoaded(true));
+  }, [user]);
+
+  const handlePrefsChange = async (newPrefs: MayoristaPrefs) => {
+    setPrefs(newPrefs);
+    if (!user) return;
+    try {
+      await saveMayoristaPrefs(user.id, newPrefs);
+    } catch {
+      toast.error("Error al guardar preferencias");
+    }
+  };
+
   return (
     <MainLayout title="Mayorista" description="Gestión de productos y precios del mayorista">
       <div className="space-y-4">
         <PageHeader description="Productos y precios del mayorista" />
+
+        {/* Panel de preferencias de columnas */}
+        {prefsLoaded && (
+          <Card className="rounded-2xl border-dashed">
+            <CardContent className="py-3 px-4">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Settings2 className="h-3.5 w-3.5" />
+                  <span className="font-medium">Columnas visibles:</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="show-codbar"
+                    checked={prefs.showCodigoBarras}
+                    onCheckedChange={(v) =>
+                      handlePrefsChange({ ...prefs, showCodigoBarras: !!v })
+                    }
+                  />
+                  <Label htmlFor="show-codbar" className="text-xs cursor-pointer">
+                    Código de barras
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="show-rubro"
+                    checked={prefs.showRubro}
+                    onCheckedChange={(v) =>
+                      handlePrefsChange({ ...prefs, showRubro: !!v })
+                    }
+                  />
+                  <Label htmlFor="show-rubro" className="text-xs cursor-pointer">
+                    Rubro
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="show-subrubro"
+                    checked={prefs.showSubrubro}
+                    onCheckedChange={(v) =>
+                      handlePrefsChange({ ...prefs, showSubrubro: !!v })
+                    }
+                  />
+                  <Label htmlFor="show-subrubro" className="text-xs cursor-pointer">
+                    Subrubros
+                  </Label>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Tabs defaultValue="lista">
           <TabsList className="rounded-xl">
             <TabsTrigger value="lista" className="rounded-lg">Lista de precios</TabsTrigger>
@@ -127,11 +227,17 @@ export default function MayoristaPage() {
             <ListaPrecios
               productos={productos}
               loading={loading}
+              prefs={prefs}
               onReload={cargar}
               onProductosImportados={(nuevos) => setProductos(nuevos)}
               onCategoriaChange={(id, cat) =>
                 setProductos((prev) =>
                   prev.map((p) => (p.id === id ? { ...p, categoria: cat } : p))
+                )
+              }
+              onHabilitarChange={(id, changes) =>
+                setProductos((prev) =>
+                  prev.map((p) => (p.id === id ? { ...p, ...changes } : p))
                 )
               }
             />
@@ -168,26 +274,43 @@ export default function MayoristaPage() {
 function ListaPrecios({
   productos,
   loading,
+  prefs,
   onReload,
   onProductosImportados,
   onCategoriaChange,
+  onHabilitarChange,
 }: {
   productos: MayoristaProducto[];
   loading: boolean;
+  prefs: MayoristaPrefs;
   onReload: () => void;
   onProductosImportados: (nuevos: MayoristaProducto[]) => void;
   onCategoriaChange: (id: string, cat: string) => void;
+  onHabilitarChange: (id: string, changes: Partial<MayoristaProducto>) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [categoriaFiltro, setCategoriaFiltro] = useState("todas");
+  const [rubroFiltro, setRubroFiltro] = useState("todos");
+  const [subrubroFiltro, setSubrubroFiltro] = useState("todos");
   const [importOpen, setImportOpen] = useState(false);
   const [editingCategoria, setEditingCategoria] = useState<string | null>(null);
   const [categoriaInput, setCategoriaInput] = useState("");
+  const [habilitarTarget, setHabilitarTarget] = useState<MayoristaProducto | null>(null);
 
-  const categorias = useMemo(() => {
-    const set = new Set(productos.map((p) => p.categoria).filter(Boolean));
-    return ["todas", ...Array.from(set).sort()];
+  const rubros = useMemo(() => {
+    const set = new Set(productos.map((p) => p.rubro).filter(Boolean));
+    return ["todos", ...Array.from(set as Set<string>).sort()];
   }, [productos]);
+
+  const subrubros = useMemo(() => {
+    const set = new Set<string>();
+    productos.forEach((p) => {
+      if (!p.subrubro) return;
+      if (rubroFiltro !== "todos" && p.rubro !== rubroFiltro) return;
+      const [s1] = getSubrubros(p.subrubro);
+      if (s1) set.add(s1);
+    });
+    return ["todos", ...Array.from(set).sort()];
+  }, [productos, rubroFiltro]);
 
   const filtrados = useMemo(() => {
     const q = search.toLowerCase();
@@ -195,12 +318,15 @@ function ListaPrecios({
       const matchSearch =
         !q ||
         p.nombre.toLowerCase().includes(q) ||
-        p.codigo.toLowerCase().includes(q);
-      const matchCat =
-        categoriaFiltro === "todas" || p.categoria === categoriaFiltro;
-      return matchSearch && matchCat;
+        p.codigo.toLowerCase().includes(q) ||
+        (p.codigoBarras ?? "").includes(q);
+      const matchRubro = rubroFiltro === "todos" || p.rubro === rubroFiltro;
+      const matchSub =
+        subrubroFiltro === "todos" ||
+        (p.subrubro ? getSubrubros(p.subrubro)[0] === subrubroFiltro : false);
+      return matchSearch && matchRubro && matchSub;
     });
-  }, [productos, search, categoriaFiltro]);
+  }, [productos, search, rubroFiltro, subrubroFiltro]);
 
   const guardarCategoria = async (id: string) => {
     const cat = categoriaInput.trim();
@@ -218,11 +344,11 @@ function ListaPrecios({
   return (
     <div className="space-y-4">
       {/* Controles */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre o código..."
+            placeholder="Buscar por nombre, código o cód. barras..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10 rounded-xl"
@@ -238,14 +364,26 @@ function ListaPrecios({
             </Button>
           )}
         </div>
-        <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
-          <SelectTrigger className="w-full sm:w-52 rounded-xl">
-            <SelectValue placeholder="Categoría" />
+        <Select value={rubroFiltro} onValueChange={(v) => { setRubroFiltro(v); setSubrubroFiltro("todos"); }}>
+          <SelectTrigger className="w-full sm:w-48 rounded-xl">
+            <SelectValue placeholder="Rubro" />
           </SelectTrigger>
           <SelectContent>
-            {categorias.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c === "todas" ? "Todas las categorías" : c}
+            {rubros.map((r) => (
+              <SelectItem key={r} value={r}>
+                {r === "todos" ? "Todos los rubros" : r}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={subrubroFiltro} onValueChange={setSubrubroFiltro}>
+          <SelectTrigger className="w-full sm:w-48 rounded-xl">
+            <SelectValue placeholder="Subrubro" />
+          </SelectTrigger>
+          <SelectContent>
+            {subrubros.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s === "todos" ? "Todos los subrubros" : s}
               </SelectItem>
             ))}
           </SelectContent>
@@ -289,84 +427,157 @@ function ListaPrecios({
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Código</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Nombre</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Categoría</th>
-                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground">Precio mayorista</th>
-                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground">Uds/bulto</th>
-                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground">Stock local</th>
+                  {prefs.showCodigoBarras && (
+                    <th className="text-left px-3 py-3 font-semibold text-muted-foreground whitespace-nowrap">
+                      Cód. barras
+                    </th>
+                  )}
+                  <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Código</th>
+                  <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Descripción</th>
+                  <th className="text-right px-3 py-3 font-semibold text-muted-foreground whitespace-nowrap">
+                    Cons. Final
+                  </th>
+                  {prefs.showRubro && (
+                    <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Rubro</th>
+                  )}
+                  {prefs.showSubrubro && (
+                    <>
+                      <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Subrubro 1</th>
+                      <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Subrubro 2</th>
+                      <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Subrubro 3</th>
+                    </>
+                  )}
+                  <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Categoría</th>
+                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtrados.map((p) => (
-                  <tr key={p.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {p.codigo}
-                    </td>
-                    <td className="px-4 py-3 font-medium max-w-xs truncate">{p.nombre}</td>
-                    <td className="px-4 py-3">
-                      {editingCategoria === p.id ? (
-                        <div className="flex items-center gap-1">
-                          <Input
-                            value={categoriaInput}
-                            onChange={(e) => setCategoriaInput(e.target.value)}
-                            className="h-7 text-xs rounded-lg w-32"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") guardarCategoria(p.id);
-                              if (e.key === "Escape") setEditingCategoria(null);
-                            }}
-                          />
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => guardarCategoria(p.id)}
-                          >
-                            <Check className="h-3.5 w-3.5 text-green-600" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => setEditingCategoria(null)}
-                          >
-                            <X className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <button
-                          className="flex items-center gap-1.5 group"
-                          onClick={() => {
-                            setEditingCategoria(p.id);
-                            setCategoriaInput(p.categoria);
-                          }}
-                        >
-                          <Badge variant="secondary" className="text-xs font-normal">
-                            {p.categoria || "Sin categoría"}
-                          </Badge>
-                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </button>
+                {filtrados.map((p) => {
+                  const [s1, s2, s3] = getSubrubros(p.subrubro ?? "");
+                  return (
+                    <tr
+                      key={p.id}
+                      className={`hover:bg-muted/20 transition-colors ${p.habilitado ? "bg-teal-50/30 dark:bg-teal-950/10" : ""}`}
+                    >
+                      {prefs.showCodigoBarras && (
+                        <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                          {p.codigoBarras || "—"}
+                        </td>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-teal-600">
-                      {formatCurrency(p.precioUnitarioMayorista)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">
-                      {p.unidadesPorBulto}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={p.stockLocal === 0 ? "text-destructive font-semibold" : "font-semibold"}>
-                        {p.stockLocal}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">
+                        {p.codigo}
+                      </td>
+                      <td className="px-3 py-2.5 font-medium max-w-[220px] truncate">{p.nombre}</td>
+                      <td className="px-3 py-2.5 text-right font-semibold text-teal-600 whitespace-nowrap">
+                        {formatCurrency(p.precioUnitarioMayorista)}
+                      </td>
+                      {prefs.showRubro && (
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                          {p.rubro || "—"}
+                        </td>
+                      )}
+                      {prefs.showSubrubro && (
+                        <>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                            {s1 || "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                            {s2 || "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                            {s3 || "—"}
+                          </td>
+                        </>
+                      )}
+                      <td className="px-3 py-2.5">
+                        {editingCategoria === p.id ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={categoriaInput}
+                              onChange={(e) => setCategoriaInput(e.target.value)}
+                              className="h-7 text-xs rounded-lg w-28"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") guardarCategoria(p.id);
+                                if (e.key === "Escape") setEditingCategoria(null);
+                              }}
+                            />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => guardarCategoria(p.id)}
+                            >
+                              <Check className="h-3.5 w-3.5 text-green-600" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => setEditingCategoria(null)}
+                            >
+                              <X className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <button
+                            className="flex items-center gap-1.5 group"
+                            onClick={() => {
+                              setEditingCategoria(p.id);
+                              setCategoriaInput(p.categoria);
+                            }}
+                          >
+                            <Badge variant="secondary" className="text-xs font-normal">
+                              {p.categoria || "Sin categoría"}
+                            </Badge>
+                            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        {p.habilitado ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
+                            onClick={async () => {
+                              try {
+                                await deshabilitarProducto(p.id);
+                                onHabilitarChange(p.id, { habilitado: false });
+                                toast.success("Producto deshabilitado");
+                              } catch {
+                                toast.error("Error al deshabilitar");
+                              }
+                            }}
+                          >
+                            <PackageX className="h-3 w-3" />
+                            Deshabilitar
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs rounded-lg text-teal-600 border-teal-600/30 hover:bg-teal-50 dark:hover:bg-teal-950/30 gap-1"
+                            onClick={() => setHabilitarTarget(p)}
+                          >
+                            <PackagePlus className="h-3 w-3" />
+                            Habilitar
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <div className="px-4 py-2 bg-muted/30 border-t text-xs text-muted-foreground">
             {filtrados.length} de {productos.length} productos
+            {productos.filter((p) => p.habilitado).length > 0 && (
+              <span className="ml-3 text-teal-600 font-medium">
+                · {productos.filter((p) => p.habilitado).length} habilitados
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -382,7 +593,150 @@ function ListaPrecios({
           toast.success(`${actualizados.length} productos importados`);
         }}
       />
+
+      {/* Modal habilitar producto */}
+      {habilitarTarget && (
+        <HabilitarModal
+          producto={habilitarTarget}
+          onClose={() => setHabilitarTarget(null)}
+          onConfirm={(changes) => {
+            onHabilitarChange(habilitarTarget.id, changes);
+            setHabilitarTarget(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── Modal para habilitar un producto ────────────────────────────────────────
+function HabilitarModal({
+  producto,
+  onClose,
+  onConfirm,
+}: {
+  producto: MayoristaProducto;
+  onClose: () => void;
+  onConfirm: (changes: Partial<MayoristaProducto>) => void;
+}) {
+  const [lote, setLote] = useState(producto.lote ? String(producto.lote) : "");
+  const [seDivide, setSeDivide] = useState(
+    producto.seDivideEn ? String(producto.seDivideEn) : ""
+  );
+  const [saving, setSaving] = useState(false);
+
+  const loteNum = parseInt(lote) || 0;
+  const divideNum = parseInt(seDivide) || 0;
+  const porciones = divideNum > 0 ? Math.floor(loteNum / divideNum) : 0;
+
+  const handleConfirmar = async () => {
+    if (loteNum <= 0 || divideNum <= 0) {
+      toast.error("Ingresá valores válidos para lote y división");
+      return;
+    }
+    setSaving(true);
+    try {
+      await habilitarProducto(producto, loteNum, divideNum);
+      toast.success(`"${producto.nombre}" habilitado — ${porciones} porciones en stock`);
+      onConfirm({
+        habilitado: true,
+        lote: loteNum,
+        seDivideEn: divideNum,
+      });
+    } catch {
+      toast.error("Error al habilitar el producto");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PackagePlus className="h-5 w-5 text-teal-600" />
+            Habilitar producto
+          </DialogTitle>
+          <DialogDescription className="font-medium text-foreground/80 line-clamp-2">
+            {producto.nombre}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {producto.precioVenta <= 0 && (
+            <div className="flex items-start gap-2 text-xs bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-amber-700 dark:text-amber-400">
+              <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>Este producto no tiene precio de venta configurado. Podés habilitarlo igual y asignar el precio después.</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="lote" className="text-sm">
+                Lote total
+              </Label>
+              <Input
+                id="lote"
+                type="number"
+                min="1"
+                placeholder="Ej: 30"
+                value={lote}
+                onChange={(e) => setLote(e.target.value)}
+                className="rounded-xl"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">Cuántas unidades entran</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="divide" className="text-sm">
+                Se divide en
+              </Label>
+              <Input
+                id="divide"
+                type="number"
+                min="1"
+                placeholder="Ej: 10"
+                value={seDivide}
+                onChange={(e) => setSeDivide(e.target.value)}
+                className="rounded-xl"
+              />
+              <p className="text-xs text-muted-foreground">Unidades por porción</p>
+            </div>
+          </div>
+
+          {loteNum > 0 && divideNum > 0 && (
+            <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 p-3 text-center">
+              <p className="text-2xl font-bold text-teal-600">{porciones}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                porciones de {divideNum} unidades cada una
+              </p>
+              <p className="text-xs text-teal-600 font-medium mt-1">
+                → Stock que se cargará en Productos: {porciones}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleConfirmar}
+            disabled={saving || loteNum <= 0 || divideNum <= 0}
+            className="gap-2"
+          >
+            {saving ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Check className="h-4 w-4" />
+            )}
+            Habilitar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -401,11 +755,14 @@ function ExcelImportDialog({
   const [columns, setColumns] = useState<ExcelColumn[]>([]);
   const [rawRows, setRawRows] = useState<unknown[][]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({
-    codigo: "A",
-    nombre: "B",
+    codigoBarras: "A",
+    codigo: "B",
+    nombre: "C",
     precioUnitario: "D",
+    rubro: "E",
+    subrubro: "F",
     unidadesPorBulto: "H",
-    categoria: "S",
+    categoria: "E",
   });
   const [parsed, setParsed] = useState<ParsedRow[]>([]);
   const [saving, setSaving] = useState(false);
@@ -443,7 +800,6 @@ function ExcelImportDialog({
           return;
         }
 
-        // Detectar columnas disponibles
         const maxCols = Math.max(...rows.slice(0, 3).map((r) => (r as unknown[]).length));
         const cols: ExcelColumn[] = [];
         for (let i = 0; i < maxCols; i++) {
@@ -474,16 +830,20 @@ function ExcelImportDialog({
       return index - 1;
     };
 
-    const rows = rawRows.slice(1); // skip header
+    const rows = rawRows.slice(1);
     const result: ParsedRow[] = rows
       .map((row) => {
         const r = row as unknown[];
+        const rubro = cellToString(r[letterToIndex(mapping.rubro)]);
         return {
+          codigoBarras: cellToString(r[letterToIndex(mapping.codigoBarras)]),
           codigo: cellToString(r[letterToIndex(mapping.codigo)]),
           nombre: cellToString(r[letterToIndex(mapping.nombre)]),
           precioUnitarioMayorista: cellToNumber(r[letterToIndex(mapping.precioUnitario)]),
+          rubro,
+          subrubro: cellToString(r[letterToIndex(mapping.subrubro)]),
           unidadesPorBulto: cellToNumber(r[letterToIndex(mapping.unidadesPorBulto)]) || 1,
-          categoria: cellToString(r[letterToIndex(mapping.categoria)]) || "Sin categoría",
+          categoria: cellToString(r[letterToIndex(mapping.categoria)]) || rubro || "Sin categoría",
         };
       })
       .filter((r) => r.codigo && r.nombre);
@@ -509,11 +869,14 @@ function ExcelImportDialog({
   };
 
   const camposRequeridos: { key: keyof ColumnMapping; label: string }[] = [
-    { key: "codigo", label: "Código" },
-    { key: "nombre", label: "Nombre" },
-    { key: "precioUnitario", label: "Precio unitario mayorista" },
+    { key: "codigoBarras", label: "Código de barras (col A)" },
+    { key: "codigo", label: "Código (col B)" },
+    { key: "nombre", label: "Descripción / Nombre (col C)" },
+    { key: "precioUnitario", label: "Precio Cons. Final (col D)" },
+    { key: "rubro", label: "Rubro (col E)" },
+    { key: "subrubro", label: "Subrubro (col F)" },
     { key: "unidadesPorBulto", label: "Unidades por bulto" },
-    { key: "categoria", label: "Categoría" },
+    { key: "categoria", label: "Categoría (puede ser igual a Rubro)" },
   ];
 
   return (
@@ -531,7 +894,6 @@ function ExcelImportDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Indicador de pasos */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className={step === "upload" ? "font-bold text-foreground" : ""}>1. Archivo</span>
           <ArrowRight className="h-3 w-3" />
@@ -540,7 +902,6 @@ function ExcelImportDialog({
           <span className={step === "preview" ? "font-bold text-foreground" : ""}>3. Confirmar</span>
         </div>
 
-        {/* Paso 1: Upload */}
         {step === "upload" && (
           <div className="space-y-4">
             <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-2xl cursor-pointer hover:border-teal-500 hover:bg-teal-50/5 transition-colors">
@@ -549,7 +910,7 @@ function ExcelImportDialog({
                 Hacé clic para seleccionar un archivo .xlsx
               </span>
               <span className="text-xs text-muted-foreground/60 mt-1">
-                Solo archivos Excel (.xlsx, .xls)
+                Columnas esperadas: A=Cód.barras, B=Código, C=Nombre, D=Precio, E=Rubro, F=Subrubro
               </span>
               <input
                 ref={fileRef}
@@ -562,14 +923,13 @@ function ExcelImportDialog({
             <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
               <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-500" />
               <span>
-                En el siguiente paso podrás indicar qué columna corresponde a cada campo.
-                Los datos existentes del mayorista (precios de venta y stock) se conservarán.
+                Los datos existentes (precio de venta, stock, habilitados) se conservarán.
+                El código del producto se usa para identificar si ya existe.
               </span>
             </div>
           </div>
         )}
 
-        {/* Paso 2: Mapeo */}
         {step === "mapping" && (
           <div className="space-y-4">
             <div className="text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
@@ -580,7 +940,7 @@ function ExcelImportDialog({
             <div className="space-y-3">
               {camposRequeridos.map(({ key, label }) => (
                 <div key={key} className="flex items-center gap-3">
-                  <span className="text-sm font-medium w-48 shrink-0">{label}</span>
+                  <span className="text-sm font-medium w-56 shrink-0 text-sm">{label}</span>
                   <Select
                     value={mapping[key]}
                     onValueChange={(v) =>
@@ -610,7 +970,6 @@ function ExcelImportDialog({
               ))}
             </div>
 
-            {/* Preview de columnas */}
             <div className="rounded-xl border overflow-hidden text-xs">
               <div className="bg-muted/50 px-3 py-2 font-semibold border-b text-muted-foreground">
                 Primeras filas del archivo
@@ -653,12 +1012,11 @@ function ExcelImportDialog({
           </div>
         )}
 
-        {/* Paso 3: Preview */}
         {step === "preview" && (
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground bg-muted/30 rounded-xl p-3">
               Se van a importar <strong>{parsed.length} productos</strong>.
-              Los precios de venta y stock actuales se conservarán.
+              Los precios de venta, stock y productos habilitados se conservarán.
             </div>
 
             <div className="rounded-xl border overflow-hidden">
@@ -666,23 +1024,25 @@ function ExcelImportDialog({
                 <table className="w-full text-xs">
                   <thead className="bg-muted/50 sticky top-0">
                     <tr>
+                      <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Cód. barras</th>
                       <th className="text-left px-3 py-2 font-semibold">Código</th>
                       <th className="text-left px-3 py-2 font-semibold">Nombre</th>
-                      <th className="text-left px-3 py-2 font-semibold">Categoría</th>
-                      <th className="text-right px-3 py-2 font-semibold">Precio mayorista</th>
-                      <th className="text-right px-3 py-2 font-semibold">Uds/bulto</th>
+                      <th className="text-right px-3 py-2 font-semibold whitespace-nowrap">Precio</th>
+                      <th className="text-left px-3 py-2 font-semibold">Rubro</th>
+                      <th className="text-left px-3 py-2 font-semibold">Subrubro</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {parsed.map((row, i) => (
                       <tr key={i} className="hover:bg-muted/20">
+                        <td className="px-3 py-1.5 font-mono text-muted-foreground whitespace-nowrap">{row.codigoBarras || "—"}</td>
                         <td className="px-3 py-1.5 font-mono text-muted-foreground">{row.codigo}</td>
-                        <td className="px-3 py-1.5 max-w-[200px] truncate">{row.nombre}</td>
-                        <td className="px-3 py-1.5">{row.categoria}</td>
-                        <td className="px-3 py-1.5 text-right text-teal-600 font-semibold">
+                        <td className="px-3 py-1.5 max-w-[180px] truncate">{row.nombre}</td>
+                        <td className="px-3 py-1.5 text-right text-teal-600 font-semibold whitespace-nowrap">
                           {formatCurrency(row.precioUnitarioMayorista)}
                         </td>
-                        <td className="px-3 py-1.5 text-right">{row.unidadesPorBulto}</td>
+                        <td className="px-3 py-1.5 whitespace-nowrap">{row.rubro || "—"}</td>
+                        <td className="px-3 py-1.5 max-w-[150px] truncate text-muted-foreground">{row.subrubro || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -739,13 +1099,13 @@ function PreciosVenta({
   const [gananciaInput, setGananciaInput] = useState("");
   const [applyingGlobal, setApplyingGlobal] = useState(false);
   const [search, setSearch] = useState("");
-  const [categoriaFiltro, setCategoriaFiltro] = useState("todas");
+  const [rubroFiltro, setRubroFiltro] = useState("todos");
   const [editingPrecio, setEditingPrecio] = useState<string | null>(null);
   const [precioInput, setPrecioInput] = useState("");
 
-  const categorias = useMemo(() => {
-    const set = new Set(productos.map((p) => p.categoria).filter(Boolean));
-    return ["todas", ...Array.from(set).sort()];
+  const rubros = useMemo(() => {
+    const set = new Set(productos.map((p) => p.rubro).filter(Boolean));
+    return ["todos", ...Array.from(set as Set<string>).sort()];
   }, [productos]);
 
   const filtrados = useMemo(() => {
@@ -753,11 +1113,10 @@ function PreciosVenta({
     return productos.filter((p) => {
       const matchSearch =
         !q || p.nombre.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q);
-      const matchCat =
-        categoriaFiltro === "todas" || p.categoria === categoriaFiltro;
-      return matchSearch && matchCat;
+      const matchRubro = rubroFiltro === "todos" || p.rubro === rubroFiltro;
+      return matchSearch && matchRubro;
     });
-  }, [productos, search, categoriaFiltro]);
+  }, [productos, search, rubroFiltro]);
 
   const handleAplicarGlobal = async () => {
     const porc = parseFloat(gananciaInput);
@@ -793,12 +1152,10 @@ function PreciosVenta({
     }
   };
 
-  // Porcentaje de ganancia actual (del primero que tenga gananciaGlobal)
   const gananciaActual = productos.find((p) => p.gananciaGlobal != null)?.gananciaGlobal;
 
   return (
     <div className="space-y-4">
-      {/* Panel de ganancia global */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -842,7 +1199,6 @@ function PreciosVenta({
         </CardContent>
       </Card>
 
-      {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -863,21 +1219,20 @@ function PreciosVenta({
             </Button>
           )}
         </div>
-        <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
-          <SelectTrigger className="w-full sm:w-52 rounded-xl">
-            <SelectValue placeholder="Categoría" />
+        <Select value={rubroFiltro} onValueChange={setRubroFiltro}>
+          <SelectTrigger className="w-full sm:w-48 rounded-xl">
+            <SelectValue placeholder="Rubro" />
           </SelectTrigger>
           <SelectContent>
-            {categorias.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c === "todas" ? "Todas las categorías" : c}
+            {rubros.map((r) => (
+              <SelectItem key={r} value={r}>
+                {r === "todos" ? "Todos los rubros" : r}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Tabla de precios */}
       {loading ? (
         <div className="space-y-2">
           {[...Array(8)].map((_, i) => (
@@ -900,10 +1255,10 @@ function PreciosVenta({
               <thead className="bg-muted/50 border-b">
                 <tr>
                   <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Nombre</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Categoría</th>
-                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground">Precio mayorista</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Rubro</th>
+                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground whitespace-nowrap">Precio mayorista</th>
                   <th className="text-right px-4 py-3 font-semibold text-muted-foreground">Ganancia</th>
-                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground">Precio de venta</th>
+                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground whitespace-nowrap">Precio de venta</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -917,7 +1272,7 @@ function PreciosVenta({
                       <td className="px-4 py-3 font-medium max-w-xs truncate">{p.nombre}</td>
                       <td className="px-4 py-3">
                         <Badge variant="secondary" className="text-xs font-normal">
-                          {p.categoria}
+                          {p.rubro || p.categoria}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right text-muted-foreground">
