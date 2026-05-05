@@ -45,9 +45,8 @@ export const getMayoristaProductos = async (): Promise<MayoristaProducto[]> => {
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 };
 
-// Batch size bien por debajo del límite de Firestore (500)
-const BATCH_SIZE = 450;
-const PARALLEL_BATCHES = 4;
+// Batch size conservador para no saturar el rate limit de Firestore
+const BATCH_SIZE = 200;
 
 export const upsertMayoristaProductos = async (
   productos: Omit<MayoristaProducto, "id" | "updatedAt" | "stockLocal" | "precioVenta" | "gananciaGlobal" | "habilitado" | "lote" | "seDivideEn" | "productoId">[],
@@ -61,34 +60,29 @@ export const upsertMayoristaProductos = async (
 
   let done = 0;
 
-  for (let i = 0; i < chunks.length; i += PARALLEL_BATCHES) {
-    const group = chunks.slice(i, i + PARALLEL_BATCHES);
-    await Promise.all(
-      group.map(async (chunk) => {
-        const batch = writeBatch(firestore);
-        for (const p of chunk) {
-          const id = `mp_${p.codigo.replace(/[^a-zA-Z0-9]/g, "_")}`;
-          batch.set(
-            doc(firestore, COL, id),
-            {
-              codigoBarras: p.codigoBarras ?? "",
-              codigo: p.codigo,
-              nombre: p.nombre,
-              precioUnitarioMayorista: p.precioUnitarioMayorista,
-              rubro: p.rubro ?? "",
-              subrubro: p.subrubro ?? "",
-              unidadesPorBulto: p.unidadesPorBulto,
-              categoria: p.categoria,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true } // preserva precioVenta, habilitado, lote, etc.
-          );
-        }
-        await batch.commit();
-        done += chunk.length;
-        onProgress?.(done, productos.length);
-      })
-    );
+  for (const chunk of chunks) {
+    const batch = writeBatch(firestore);
+    for (const p of chunk) {
+      const id = `mp_${p.codigo.replace(/[^a-zA-Z0-9]/g, "_")}`;
+      batch.set(
+        doc(firestore, COL, id),
+        {
+          codigoBarras: p.codigoBarras ?? "",
+          codigo: p.codigo,
+          nombre: p.nombre,
+          precioUnitarioMayorista: p.precioUnitarioMayorista,
+          rubro: p.rubro ?? "",
+          subrubro: p.subrubro ?? "",
+          unidadesPorBulto: p.unidadesPorBulto,
+          categoria: p.categoria,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true } // preserva precioVenta, habilitado, lote, etc.
+      );
+    }
+    await batch.commit();
+    done += chunk.length;
+    onProgress?.(done, productos.length);
   }
 };
 
@@ -115,24 +109,19 @@ export const applyGananciaToProducts = async (
   }
 
   let done = 0;
-  for (let i = 0; i < chunks.length; i += PARALLEL_BATCHES) {
-    const group = chunks.slice(i, i + PARALLEL_BATCHES);
-    await Promise.all(
-      group.map(async (chunk) => {
-        const batch = writeBatch(firestore);
-        chunk.forEach(({ id, precioUnitarioMayorista }) => {
-          const precioVenta = Math.round(precioUnitarioMayorista * (1 + porcentaje / 100) * 100) / 100;
-          batch.update(doc(firestore, COL, id), {
-            precioVenta,
-            gananciaGlobal: porcentaje,
-            updatedAt: serverTimestamp(),
-          });
-        });
-        await batch.commit();
-        done += chunk.length;
-        onProgress?.(done, products.length);
-      })
-    );
+  for (const chunk of chunks) {
+    const batch = writeBatch(firestore);
+    chunk.forEach(({ id, precioUnitarioMayorista }) => {
+      const precioVenta = Math.round(precioUnitarioMayorista * (1 + porcentaje / 100) * 100) / 100;
+      batch.update(doc(firestore, COL, id), {
+        precioVenta,
+        gananciaGlobal: porcentaje,
+        updatedAt: serverTimestamp(),
+      });
+    });
+    await batch.commit();
+    done += chunk.length;
+    onProgress?.(done, products.length);
   }
 };
 
