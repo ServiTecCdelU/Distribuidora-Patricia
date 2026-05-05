@@ -74,7 +74,6 @@ interface ColumnMapping {
   rubro: ColumnLetter;
   subrubro: ColumnLetter;
   unidadesPorBulto: ColumnLetter;
-  categoria: ColumnLetter;
 }
 
 interface ParsedRow {
@@ -288,13 +287,20 @@ function ListaPrecios({
   onCategoriaChange: (id: string, cat: string) => void;
   onHabilitarChange: (id: string, changes: Partial<MayoristaProducto>) => void;
 }) {
+  const PAGE_SIZE = 100;
   const [search, setSearch] = useState("");
   const [rubroFiltro, setRubroFiltro] = useState("todos");
   const [subrubroFiltro, setSubrubroFiltro] = useState("todos");
+  const [currentPage, setCurrentPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
   const [editingCategoria, setEditingCategoria] = useState<string | null>(null);
   const [categoriaInput, setCategoriaInput] = useState("");
   const [habilitarTarget, setHabilitarTarget] = useState<MayoristaProducto | null>(null);
+
+  // Reset página cuando cambian filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, rubroFiltro, subrubroFiltro]);
 
   const rubros = useMemo(() => {
     const set = new Set(productos.map((p) => p.rubro).filter(Boolean));
@@ -327,6 +333,13 @@ function ListaPrecios({
       return matchSearch && matchRubro && matchSub;
     });
   }, [productos, search, rubroFiltro, subrubroFiltro]);
+
+  // Con filtros activos: mostrar todos los resultados sin paginar
+  const hayFiltros = search || rubroFiltro !== "todos" || subrubroFiltro !== "todos";
+  const totalPages = hayFiltros ? 1 : Math.ceil(filtrados.length / PAGE_SIZE);
+  const filasPagina = hayFiltros
+    ? filtrados
+    : filtrados.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const guardarCategoria = async (id: string) => {
     const cat = categoriaInput.trim();
@@ -452,7 +465,7 @@ function ListaPrecios({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtrados.map((p) => {
+                {filasPagina.map((p) => {
                   const [s1, s2, s3] = getSubrubros(p.subrubro ?? "");
                   return (
                     <tr
@@ -571,12 +584,41 @@ function ListaPrecios({
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-2 bg-muted/30 border-t text-xs text-muted-foreground">
-            {filtrados.length} de {productos.length} productos
-            {productos.filter((p) => p.habilitado).length > 0 && (
-              <span className="ml-3 text-teal-600 font-medium">
-                · {productos.filter((p) => p.habilitado).length} habilitados
-              </span>
+          <div className="px-4 py-2 bg-muted/30 border-t flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">
+              {hayFiltros
+                ? `${filtrados.length} resultados`
+                : `${filtrados.length} productos · página ${currentPage} de ${totalPages}`}
+              {productos.filter((p) => p.habilitado).length > 0 && (
+                <span className="ml-3 text-teal-600 font-medium">
+                  · {productos.filter((p) => p.habilitado).length} habilitados
+                </span>
+              )}
+            </span>
+            {!hayFiltros && totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 rounded-lg text-xs"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                >
+                  ← Anterior
+                </Button>
+                <span className="text-xs text-muted-foreground px-2 tabular-nums">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 rounded-lg text-xs"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                >
+                  Siguiente →
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -762,7 +804,6 @@ function ExcelImportDialog({
     rubro: "E",
     subrubro: "F",
     unidadesPorBulto: "H",
-    categoria: "E",
   });
   const [parsed, setParsed] = useState<ParsedRow[]>([]);
   const [saving, setSaving] = useState(false);
@@ -845,10 +886,12 @@ function ExcelImportDialog({
           rubro,
           subrubro: cellToString(r[letterToIndex(mapping.subrubro)]),
           unidadesPorBulto: cellToNumber(r[letterToIndex(mapping.unidadesPorBulto)]) || 1,
-          categoria: cellToString(r[letterToIndex(mapping.categoria)]) || rubro || "Sin categoría",
+          // Categoría = rubro (son lo mismo)
+          categoria: rubro || "Sin categoría",
         };
       })
-      .filter((r) => r.codigo && r.nombre);
+      // Excluir filas vacías Y filas de encabezado (precio = 0 y sin código numérico real)
+      .filter((r) => r.codigo && r.nombre && r.precioUnitarioMayorista > 0);
 
     if (result.length === 0) {
       toast.error("No se encontraron filas válidas con el mapeo actual");
@@ -878,15 +921,14 @@ function ExcelImportDialog({
     { key: "codigo", label: "Código (col B)" },
     { key: "nombre", label: "Descripción / Nombre (col C)" },
     { key: "precioUnitario", label: "Precio Cons. Final (col D)" },
-    { key: "rubro", label: "Rubro (col E)" },
+    { key: "rubro", label: "Rubro / Categoría (col E)" },
     { key: "subrubro", label: "Subrubro (col F)" },
     { key: "unidadesPorBulto", label: "Unidades por bulto" },
-    { key: "categoria", label: "Categoría (puede ser igual a Rubro)" },
   ];
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-xl sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-teal-600" />
@@ -938,34 +980,28 @@ function ExcelImportDialog({
         {step === "mapping" && (
           <div className="space-y-4">
             <div className="text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
-              Se detectaron <strong>{columns.length} columnas</strong> en el archivo.
-              Asigná cada campo del sistema a la columna correcta.
+              Se detectaron <strong>{columns.length} columnas</strong>. Asigná cada campo a su columna.
             </div>
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {camposRequeridos.map(({ key, label }) => (
-                <div key={key} className="flex items-center gap-3">
-                  <span className="text-sm font-medium w-56 shrink-0 text-sm">{label}</span>
+                <div key={key} className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">{label}</Label>
                   <Select
                     value={mapping[key]}
                     onValueChange={(v) =>
                       setMapping((prev) => ({ ...prev, [key]: v }))
                     }
                   >
-                    <SelectTrigger className="rounded-xl flex-1">
+                    <SelectTrigger className="rounded-xl h-9 text-sm">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="max-h-72">
+                    <SelectContent className="max-h-64">
                       {columns.map((col) => (
                         <SelectItem key={col.letter} value={col.letter}>
-                          <span className="font-mono font-bold text-teal-600 mr-2">
-                            {col.letter}
-                          </span>
-                          {col.header && (
-                            <span className="text-muted-foreground mr-1">{col.header} —</span>
-                          )}
-                          <span className="text-xs text-muted-foreground/70">
-                            {col.preview.filter(Boolean).slice(0, 2).join(", ")}
+                          <span className="font-mono font-bold text-teal-600 mr-1.5">{col.letter}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                            {col.header || col.preview.filter(Boolean)[0] || "—"}
                           </span>
                         </SelectItem>
                       ))}
@@ -975,27 +1011,27 @@ function ExcelImportDialog({
               ))}
             </div>
 
+            {/* Preview compacto solo primeras 3 cols */}
             <div className="rounded-xl border overflow-hidden text-xs">
-              <div className="bg-muted/50 px-3 py-2 font-semibold border-b text-muted-foreground">
-                Primeras filas del archivo
-              </div>
+              <p className="bg-muted/50 px-3 py-1.5 font-medium text-muted-foreground border-b text-xs">
+                Vista previa del archivo (primeras 3 filas)
+              </p>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr>
-                      {columns.slice(0, 10).map((col) => (
-                        <th key={col.letter} className="px-2 py-1.5 text-left font-mono text-teal-600 bg-muted/20 border-b border-r last:border-r-0">
+                      {columns.slice(0, 8).map((col) => (
+                        <th key={col.letter} className="px-2 py-1 text-left font-mono text-teal-600 bg-muted/20 border-r last:border-r-0 text-xs whitespace-nowrap">
                           {col.letter}
                         </th>
                       ))}
-                      {columns.length > 10 && <th className="px-2 py-1.5 text-muted-foreground">...</th>}
                     </tr>
                   </thead>
                   <tbody>
-                    {rawRows.slice(0, 4).map((row, ri) => (
-                      <tr key={ri} className="border-b last:border-b-0">
-                        {(row as unknown[]).slice(0, 10).map((cell, ci) => (
-                          <td key={ci} className="px-2 py-1 border-r last:border-r-0 max-w-[100px] truncate">
+                    {rawRows.slice(0, 3).map((row, ri) => (
+                      <tr key={ri} className="border-t">
+                        {(row as unknown[]).slice(0, 8).map((cell, ci) => (
+                          <td key={ci} className="px-2 py-1 border-r last:border-r-0 max-w-[90px] truncate text-xs">
                             {cellToString(cell)}
                           </td>
                         ))}
@@ -1007,12 +1043,8 @@ function ExcelImportDialog({
             </div>
 
             <div className="flex justify-between gap-2">
-              <Button variant="outline" className="rounded-xl" onClick={reset}>
-                Volver
-              </Button>
-              <Button className="rounded-xl" onClick={previewMapping}>
-                Ver preview
-              </Button>
+              <Button variant="outline" size="sm" className="rounded-xl" onClick={reset}>Volver</Button>
+              <Button size="sm" className="rounded-xl" onClick={previewMapping}>Ver preview →</Button>
             </div>
           </div>
         )}
@@ -1025,34 +1057,37 @@ function ExcelImportDialog({
             </div>
 
             <div className="rounded-xl border overflow-hidden">
-              <div className="overflow-x-auto max-h-64">
+              <div className="overflow-x-auto max-h-52">
                 <table className="w-full text-xs">
                   <thead className="bg-muted/50 sticky top-0">
                     <tr>
-                      <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Cód. barras</th>
-                      <th className="text-left px-3 py-2 font-semibold">Código</th>
-                      <th className="text-left px-3 py-2 font-semibold">Nombre</th>
-                      <th className="text-right px-3 py-2 font-semibold whitespace-nowrap">Precio</th>
-                      <th className="text-left px-3 py-2 font-semibold">Rubro</th>
-                      <th className="text-left px-3 py-2 font-semibold">Subrubro</th>
+                      <th className="text-left px-2 py-2 font-semibold whitespace-nowrap">Cód.barras</th>
+                      <th className="text-left px-2 py-2 font-semibold">Código</th>
+                      <th className="text-left px-2 py-2 font-semibold">Nombre</th>
+                      <th className="text-right px-2 py-2 font-semibold whitespace-nowrap">Precio</th>
+                      <th className="text-left px-2 py-2 font-semibold hidden sm:table-cell">Rubro</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {parsed.map((row, i) => (
+                    {parsed.slice(0, 200).map((row, i) => (
                       <tr key={i} className="hover:bg-muted/20">
-                        <td className="px-3 py-1.5 font-mono text-muted-foreground whitespace-nowrap">{row.codigoBarras || "—"}</td>
-                        <td className="px-3 py-1.5 font-mono text-muted-foreground">{row.codigo}</td>
-                        <td className="px-3 py-1.5 max-w-[180px] truncate">{row.nombre}</td>
-                        <td className="px-3 py-1.5 text-right text-teal-600 font-semibold whitespace-nowrap">
+                        <td className="px-2 py-1 font-mono text-muted-foreground whitespace-nowrap">{row.codigoBarras || "—"}</td>
+                        <td className="px-2 py-1 font-mono text-muted-foreground whitespace-nowrap">{row.codigo}</td>
+                        <td className="px-2 py-1 max-w-[140px] truncate">{row.nombre}</td>
+                        <td className="px-2 py-1 text-right text-teal-600 font-semibold whitespace-nowrap">
                           {formatCurrency(row.precioUnitarioMayorista)}
                         </td>
-                        <td className="px-3 py-1.5 whitespace-nowrap">{row.rubro || "—"}</td>
-                        <td className="px-3 py-1.5 max-w-[150px] truncate text-muted-foreground">{row.subrubro || "—"}</td>
+                        <td className="px-2 py-1 whitespace-nowrap hidden sm:table-cell">{row.rubro || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {parsed.length > 200 && (
+                <p className="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20">
+                  Mostrando 200 de {parsed.length} filas en la vista previa
+                </p>
+              )}
             </div>
 
             {saving && progress.total > 0 && (

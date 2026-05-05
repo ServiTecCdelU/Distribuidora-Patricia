@@ -33,10 +33,18 @@ function clearStoredProfile() {
 let cachedProfile: { uid: string; user: User } | null = getStoredProfile()
 
 export const useAuth = () => {
-  const [user, setUser] = useState<User | null>(cachedProfile?.user ?? null)
-  const [loading, setLoading] = useState(!cachedProfile)
+  // Siempre null en el render inicial para que server y client coincidan (evita hydration mismatch).
+  // El caché se restaura en el efecto, que corre sólo en el cliente.
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Restaurar perfil cacheado inmediatamente (antes de que Firebase responda)
+    if (cachedProfile) {
+      setUser(cachedProfile.user)
+      setLoading(false)
+    }
+
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (!firebaseUser) {
         cachedProfile = null
