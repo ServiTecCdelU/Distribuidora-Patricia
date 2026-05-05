@@ -102,20 +102,48 @@ export const updateMayoristaProducto = async (
   });
 };
 
+// Aplica un porcentaje a una lista de productos ya cargados en memoria (sin re-leer Firestore).
+// Usa batches paralelos para máxima velocidad.
+export const applyGananciaToProducts = async (
+  porcentaje: number,
+  products: Array<{ id: string; precioUnitarioMayorista: number }>,
+  onProgress?: (done: number, total: number) => void
+): Promise<void> => {
+  const chunks: typeof products[] = [];
+  for (let i = 0; i < products.length; i += BATCH_SIZE) {
+    chunks.push(products.slice(i, i + BATCH_SIZE));
+  }
+
+  let done = 0;
+  for (let i = 0; i < chunks.length; i += PARALLEL_BATCHES) {
+    const group = chunks.slice(i, i + PARALLEL_BATCHES);
+    await Promise.all(
+      group.map(async (chunk) => {
+        const batch = writeBatch(firestore);
+        chunk.forEach(({ id, precioUnitarioMayorista }) => {
+          const precioVenta = Math.round(precioUnitarioMayorista * (1 + porcentaje / 100) * 100) / 100;
+          batch.update(doc(firestore, COL, id), {
+            precioVenta,
+            gananciaGlobal: porcentaje,
+            updatedAt: serverTimestamp(),
+          });
+        });
+        await batch.commit();
+        done += chunk.length;
+        onProgress?.(done, products.length);
+      })
+    );
+  }
+};
+
+// Mantiene compatibilidad (lee de Firestore, útil si no hay productos en memoria)
 export const applyGananciaGlobal = async (porcentaje: number): Promise<void> => {
   const snap = await getDocs(collection(firestore, COL));
-  const batch = writeBatch(firestore);
-  snap.docs.forEach((d) => {
-    const data = d.data() as Record<string, unknown>;
-    const precioVenta =
-      Math.round(((data.precioUnitarioMayorista as number) ?? 0) * (1 + porcentaje / 100) * 100) / 100;
-    batch.update(doc(firestore, COL, d.id), {
-      precioVenta,
-      gananciaGlobal: porcentaje,
-      updatedAt: serverTimestamp(),
-    });
-  });
-  await batch.commit();
+  const products = snap.docs.map((d) => ({
+    id: d.id,
+    precioUnitarioMayorista: (d.data().precioUnitarioMayorista as number) ?? 0,
+  }));
+  await applyGananciaToProducts(porcentaje, products);
 };
 
 // ─── Habilitar / Deshabilitar ─────────────────────────────────────────────────
@@ -123,19 +151,21 @@ export const applyGananciaGlobal = async (porcentaje: number): Promise<void> => 
 export const habilitarProducto = async (
   mp: MayoristaProducto,
   lote: number,
-  seDivideEn: number
+  seDivideEn: number,
+  precioVentaOverride?: number
 ): Promise<void> => {
   const stock = Math.floor(lote / seDivideEn);
+  const precio = precioVentaOverride ?? mp.precioVenta;
 
   let productoId = mp.productoId;
 
   if (productoId) {
-    await updateProduct(productoId, { stock, price: mp.precioVenta });
+    await updateProduct(productoId, { stock, price: precio });
   } else {
     const created = await createProduct({
       name: mp.nombre,
       description: mp.codigo,
-      price: mp.precioVenta,
+      price: precio,
       stock,
       imageUrl: "",
       category: mp.rubro || mp.categoria || "Sin categoría",
