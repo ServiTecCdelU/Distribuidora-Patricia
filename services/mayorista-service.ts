@@ -52,10 +52,34 @@ export const upsertMayoristaProductos = async (
   productos: Omit<MayoristaProducto, "id" | "updatedAt" | "stockLocal" | "precioVenta" | "gananciaGlobal" | "habilitado" | "lote" | "seDivideEn" | "productoId">[],
   onProgress?: (done: number, total: number) => void
 ): Promise<void> => {
-  // Sin pre-lectura: merge:true preserva los campos que no se incluyen en el set
-  const chunks: typeof productos[] = [];
-  for (let i = 0; i < productos.length; i += BATCH_SIZE) {
-    chunks.push(productos.slice(i, i + BATCH_SIZE));
+  // Pre-lectura para detectar cambios y solo escribir los productos que cambiaron.
+  // Trades reads (50K/día) por writes (20K/día) — mucho más eficiente para importaciones diarias.
+  onProgress?.(0, productos.length);
+  const snap = await getDocs(collection(firestore, COL));
+  const existingMap = new Map<string, Record<string, unknown>>();
+  snap.docs.forEach((d) => existingMap.set(d.id, d.data() as Record<string, unknown>));
+
+  const toWrite = productos.filter((p) => {
+    const id = `mp_${p.codigo.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const ex = existingMap.get(id);
+    if (!ex) return true; // nuevo producto
+    return (
+      ex.nombre !== p.nombre ||
+      ex.precioUnitarioMayorista !== p.precioUnitarioMayorista ||
+      ex.codigoBarras !== (p.codigoBarras ?? "") ||
+      ex.rubro !== (p.rubro ?? "") ||
+      ex.subrubro !== (p.subrubro ?? "")
+    );
+  });
+
+  if (toWrite.length === 0) {
+    onProgress?.(productos.length, productos.length);
+    return;
+  }
+
+  const chunks: typeof toWrite[] = [];
+  for (let i = 0; i < toWrite.length; i += BATCH_SIZE) {
+    chunks.push(toWrite.slice(i, i + BATCH_SIZE));
   }
 
   let done = 0;
@@ -82,8 +106,10 @@ export const upsertMayoristaProductos = async (
     }
     await batch.commit();
     done += chunk.length;
-    onProgress?.(done, productos.length);
+    // Progreso relativo al total original (no solo los que cambiaron)
+    onProgress?.(Math.round((done / toWrite.length) * productos.length), productos.length);
   }
+  onProgress?.(productos.length, productos.length);
 };
 
 export const updateMayoristaProducto = async (

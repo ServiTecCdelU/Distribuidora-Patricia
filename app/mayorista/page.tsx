@@ -1337,7 +1337,9 @@ function PreciosVenta({
     if (distintos.length > 0) {
       setConfirmGanancia(porc);
     } else {
-      ejecutarGananciaGlobal(porc, productos.map((p) => ({ id: p.id, precioUnitarioMayorista: p.precioUnitarioMayorista })));
+      // Solo escribir los que realmente van a cambiar
+      const necesitan = productos.filter((p) => p.gananciaGlobal !== porc);
+      ejecutarGananciaGlobal(porc, necesitan.map((p) => ({ id: p.id, precioUnitarioMayorista: p.precioUnitarioMayorista })));
     }
   };
 
@@ -1345,6 +1347,10 @@ function PreciosVenta({
     porc: number,
     prods: Array<{ id: string; precioUnitarioMayorista: number }>
   ) => {
+    if (prods.length === 0) {
+      toast.info("Todos los productos ya tienen ese porcentaje");
+      return;
+    }
     setApplyingGlobal(true);
     setProgressGanancia({ done: 0, total: prods.length });
     try {
@@ -1374,9 +1380,13 @@ function PreciosVenta({
       for (const g of grupos) {
         const porc = parseFloat(g.newPorcentaje);
         const porcFinal = isNaN(porc) ? (g.porcentaje ?? 0) : porc;
-        await applyGananciaToProducts(porcFinal, g.productos, (done) =>
-          setProgressGanancia({ done: offset + done, total: totalProds })
-        );
+        // Solo escribir si el nuevo % es distinto al actual del grupo
+        const prodsCambiar = porcFinal !== g.porcentaje ? g.productos : [];
+        if (prodsCambiar.length > 0) {
+          await applyGananciaToProducts(porcFinal, prodsCambiar, (done) =>
+            setProgressGanancia({ done: offset + done, total: totalProds })
+          );
+        }
         for (const p of g.productos) {
           updates.push({
             id: p.id,
