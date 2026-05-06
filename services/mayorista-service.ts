@@ -267,10 +267,11 @@ export const habilitarProducto = async (
   let productoId = mp.productoId;
 
   if (productoId) {
-    // Solo actualizar stock y precio — sin releer el doc después
+    // Actualizar stock, precio y asegurar que esté habilitado
     await updateDoc(doc(firestore, PRODUCTS_COLLECTION, productoId), {
       stock,
       price: precio,
+      disabled: false,
     });
   } else {
     // ID determinístico basado en el código del mayorista, sin loop de lecturas
@@ -314,14 +315,14 @@ export const deshabilitarProducto = async (mp: MayoristaProducto): Promise<void>
     updatedAt: serverTimestamp(),
   });
 
-  // También deshabilitar en la colección productos para que desaparezca del catálogo
-  if (mp.productoId) {
-    try {
-      await updateDoc(doc(firestore, PRODUCTS_COLLECTION, mp.productoId), {
-        disabled: true,
-      });
-    } catch { /* si el doc no existe, ignorar */ }
-  }
+  // Deshabilitar en la colección productos.
+  // Usar productoId guardado; si no existe, derivar el ID determinístico (prod_<mp.id>).
+  const productoId = mp.productoId ?? `prod_${mp.id}`;
+  try {
+    await updateDoc(doc(firestore, PRODUCTS_COLLECTION, productoId), {
+      disabled: true,
+    });
+  } catch { /* si el doc no existe, ignorar */ }
 
   // Actualizar caché local
   const cached = readCache();
