@@ -22,7 +22,7 @@ export default function HomePage() {
       if (user.employeeType === 'transportista') {
         router.push('/pedidos')
       } else {
-        router.push('/ventas/nueva')
+        router.push('/vendedor')
       }
     } else {
       router.push('/login')
