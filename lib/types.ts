@@ -208,6 +208,7 @@ export interface MayoristaProducto {
   categoria: string;
   precioVenta: number;
   gananciaGlobal?: number;
+  gananciaIndividual?: boolean; // true = precio seteado manualmente, saltear en "Aplicar a todos"
   stockLocal: number;
   // Habilitar en productos
   habilitado?: boolean;

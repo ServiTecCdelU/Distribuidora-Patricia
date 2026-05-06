@@ -650,6 +650,7 @@ export default function ProductosPage() {
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
+      if ((product as any).disabled) return false;
       const matchesSearch =
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1705,8 +1706,15 @@ function PreciosVentaHabilitados() {
   const handleAplicarGlobal = async () => {
     const porc = parseFloat(gananciaInput);
     if (isNaN(porc) || porc < 0) { toast.error("Ingresá un porcentaje válido"); return; }
-    const necesitan = productos.filter((p) => p.gananciaGlobal !== porc);
-    if (necesitan.length === 0) { toast.info("Todos ya tienen ese porcentaje"); return; }
+    // Saltear productos con precio individual — solo actualizar los "globales"
+    const necesitan = productos.filter((p) => !p.gananciaIndividual && p.gananciaGlobal !== porc);
+    const individuales = productos.filter((p) => p.gananciaIndividual).length;
+    if (necesitan.length === 0) {
+      toast.info(individuales > 0
+        ? `Todos ya tienen ese porcentaje (${individuales} con precio individual sin modificar)`
+        : "Todos ya tienen ese porcentaje");
+      return;
+    }
     setApplyingGlobal(true);
     setProgressGanancia({ done: 0, total: necesitan.length });
     try {
@@ -1718,11 +1726,15 @@ function PreciosVentaHabilitados() {
       setProductos((prev) =>
         prev.map((p) =>
           necesitan.some((n) => n.id === p.id)
-            ? { ...p, gananciaGlobal: porc, precioVenta: Math.round(p.precioUnitarioMayorista * (1 + porc / 100) * 100) / 100 }
+            ? { ...p, gananciaGlobal: porc, gananciaIndividual: false, precioVenta: Math.round(p.precioUnitarioMayorista * (1 + porc / 100) * 100) / 100 }
             : p
         )
       );
-      toast.success(`Ganancia del ${porc}% aplicada a ${necesitan.length} productos`);
+      toast.success(
+        individuales > 0
+          ? `${porc}% aplicado a ${necesitan.length} productos · ${individuales} con precio individual sin modificar`
+          : `Ganancia del ${porc}% aplicada a ${necesitan.length} productos`
+      );
     } catch {
       toast.error("Error al aplicar la ganancia");
     } finally {
@@ -1735,10 +1747,10 @@ function PreciosVentaHabilitados() {
     const precio = parseFloat(precioInput.replace(",", "."));
     if (isNaN(precio) || precio < 0) { toast.error("Precio inválido"); return; }
     try {
-      await updateMayoristaProducto(p.id, { precioVenta: precio });
-      setProductos((prev) => prev.map((x) => x.id === p.id ? { ...x, precioVenta: precio } : x));
+      await updateMayoristaProducto(p.id, { precioVenta: precio, gananciaIndividual: true });
+      setProductos((prev) => prev.map((x) => x.id === p.id ? { ...x, precioVenta: precio, gananciaIndividual: true } : x));
       setEditingId(null);
-      toast.success("Precio actualizado");
+      toast.success("Precio individual guardado");
     } catch {
       toast.error("Error al guardar el precio");
     }
@@ -1850,7 +1862,16 @@ function PreciosVentaHabilitados() {
                       {formatCurrency(p.precioUnitarioMayorista)}
                     </td>
                     <td className="px-4 py-3 text-right text-xs text-muted-foreground">
-                      {p.precioVenta > 0 ? `${ganancia.toFixed(1)}%` : "—"}
+                      {p.precioVenta > 0 ? (
+                        <span className="flex items-center justify-end gap-1.5">
+                          {`${ganancia.toFixed(1)}%`}
+                          {p.gananciaIndividual && (
+                            <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-medium">
+                              individual
+                            </span>
+                          )}
+                        </span>
+                      ) : "—"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {editingId === p.id ? (

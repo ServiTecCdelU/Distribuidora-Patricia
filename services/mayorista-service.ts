@@ -69,6 +69,7 @@ function mapDoc(id: string, data: Record<string, unknown>): MayoristaProducto {
     categoria: (data.categoria as string) ?? "Sin categoría",
     precioVenta: (data.precioVenta as number) ?? 0,
     gananciaGlobal: data.gananciaGlobal as number | undefined,
+    gananciaIndividual: (data.gananciaIndividual as boolean) ?? false,
     stockLocal: (data.stockLocal as number) ?? 0,
     habilitado: (data.habilitado as boolean) ?? false,
     lote: data.lote as number | undefined,
@@ -186,7 +187,7 @@ export const upsertMayoristaProductos = async (
 
 export const updateMayoristaProducto = async (
   id: string,
-  updates: Partial<Pick<MayoristaProducto, "categoria" | "precioVenta" | "gananciaGlobal" | "stockLocal" | "lote" | "seDivideEn">>
+  updates: Partial<Pick<MayoristaProducto, "categoria" | "precioVenta" | "gananciaGlobal" | "gananciaIndividual" | "stockLocal" | "lote" | "seDivideEn">>
 ): Promise<void> => {
   await updateDoc(doc(firestore, COL, id), {
     ...updates,
