@@ -249,6 +249,7 @@ function ListaPrecios({
   const [search, setSearch] = useState("");
   const [rubroFiltro, setRubroFiltro] = useState("todos");
   const [subrubroFiltro, setSubrubroFiltro] = useState("todos");
+  const [estadoFiltro, setEstadoFiltro] = useState<"todos" | "habilitados" | "deshabilitados">("todos");
   const [currentPage, setCurrentPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
   const [habilitarTarget, setHabilitarTarget] = useState<MayoristaProducto | null>(null);
@@ -256,7 +257,7 @@ function ListaPrecios({
   // Reset página cuando cambian filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, rubroFiltro, subrubroFiltro]);
+  }, [search, rubroFiltro, subrubroFiltro, estadoFiltro]);
 
   const rubros = useMemo(() => {
     const set = new Set(productos.map((p) => p.rubro).filter(Boolean));
@@ -286,12 +287,15 @@ function ListaPrecios({
       const matchSub =
         subrubroFiltro === "todos" ||
         (p.subrubro ? getSubrubros(p.subrubro)[0] === subrubroFiltro : false);
-      return matchSearch && matchRubro && matchSub;
+      const matchEstado =
+        estadoFiltro === "todos" ||
+        (estadoFiltro === "habilitados" ? p.habilitado : !p.habilitado);
+      return matchSearch && matchRubro && matchSub && matchEstado;
     });
-  }, [productos, search, rubroFiltro, subrubroFiltro]);
+  }, [productos, search, rubroFiltro, subrubroFiltro, estadoFiltro]);
 
   // Con filtros activos: mostrar todos los resultados sin paginar
-  const hayFiltros = search || rubroFiltro !== "todos" || subrubroFiltro !== "todos";
+  const hayFiltros = search || rubroFiltro !== "todos" || subrubroFiltro !== "todos" || estadoFiltro !== "todos";
   const totalPages = hayFiltros ? 1 : Math.ceil(filtrados.length / PAGE_SIZE);
   const filasPagina = hayFiltros
     ? filtrados
@@ -344,6 +348,16 @@ function ListaPrecios({
                 {s === "todos" ? "Todos los subrubros" : s}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={estadoFiltro} onValueChange={(v) => setEstadoFiltro(v as typeof estadoFiltro)}>
+          <SelectTrigger className="w-full sm:w-44 rounded-xl">
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="habilitados">Habilitados</SelectItem>
+            <SelectItem value="deshabilitados">Deshabilitados</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -454,7 +468,7 @@ function ListaPrecios({
                             className="h-7 text-xs rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
                             onClick={async () => {
                               try {
-                                await deshabilitarProducto(p.id);
+                                await deshabilitarProducto(p);
                                 onHabilitarChange(p.id, { habilitado: false });
                                 toast.success("Producto deshabilitado");
                               } catch {
@@ -615,6 +629,13 @@ function HabilitarModal({
             {producto.nombre}
           </DialogDescription>
         </DialogHeader>
+
+        {producto.productoId && (producto.lote || producto.seDivideEn) && (
+          <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            Valores anteriores precargados — modificalos si cambió el lote
+          </div>
+        )}
 
         <div className="space-y-4">
           {/* Precios */}
