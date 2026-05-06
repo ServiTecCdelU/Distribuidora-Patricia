@@ -195,12 +195,8 @@ export function ProductModal({
       const loteNum = parseInt(lote) || 0;
       const divideNum = parseInt(seDivideEn) || 0;
       const isMayorista = !!product?.id?.startsWith("prod_");
-      // Si se modificó lote/seDivideEn, recalcular stock
-      const finalStock = isEditing
-        ? isMayorista && loteNum > 0 && divideNum > 0
-          ? Math.floor(loteNum / divideNum)
-          : formData.stock + stockToAdd
-        : formData.stock;
+      // El stock se gestiona manualmente — nunca se calcula desde lote/seDivideEn
+      const finalStock = isEditing ? formData.stock + stockToAdd : formData.stock;
       await onSave({
         ...formData,
         description: formData.description || "",
@@ -684,7 +680,7 @@ export function ProductModal({
                   <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 p-3 text-center">
                     <p className="text-xl font-bold text-teal-600">{porcionesCalc}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      porciones → stock se actualizará a <strong>{porcionesCalc}</strong>
+                      porciones de {parseInt(seDivideEn) || 0} unidades cada una
                     </p>
                   </div>
                 )}

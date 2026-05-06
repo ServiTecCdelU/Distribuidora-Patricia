@@ -709,8 +709,8 @@ function HabilitarModal({
               <p className="text-xs text-muted-foreground mt-0.5">
                 porciones de {divideNum} unidades cada una
               </p>
-              <p className="text-xs text-teal-600 font-medium mt-1">
-                → Stock que se cargará en Productos: {porciones}
+              <p className="text-xs text-muted-foreground mt-1">
+                El stock se suma manualmente o por importación
               </p>
             </div>
           )}

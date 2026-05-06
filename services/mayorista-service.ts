@@ -261,15 +261,13 @@ export const habilitarProducto = async (
   seDivideEn: number,
   precioVentaOverride?: number
 ): Promise<void> => {
-  const stock = Math.floor(lote / seDivideEn);
   const precio = precioVentaOverride ?? mp.precioVenta;
 
   let productoId = mp.productoId;
 
   if (productoId) {
-    // Actualizar stock, precio y asegurar que esté habilitado
+    // Solo actualizar precio y asegurar que esté habilitado — el stock se gestiona aparte
     await updateDoc(doc(firestore, PRODUCTS_COLLECTION, productoId), {
-      stock,
       price: precio,
       disabled: false,
     });
@@ -280,7 +278,7 @@ export const habilitarProducto = async (
       name: mp.nombre,
       description: mp.codigo,
       price: precio,
-      stock,
+      stock: 0,
       imageUrl: "",
       category: mp.rubro || mp.categoria || "Sin categoría",
       disabled: false,
