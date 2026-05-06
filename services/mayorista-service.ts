@@ -186,7 +186,7 @@ export const upsertMayoristaProductos = async (
 
 export const updateMayoristaProducto = async (
   id: string,
-  updates: Partial<Pick<MayoristaProducto, "categoria" | "precioVenta" | "gananciaGlobal" | "stockLocal">>
+  updates: Partial<Pick<MayoristaProducto, "categoria" | "precioVenta" | "gananciaGlobal" | "stockLocal" | "lote" | "seDivideEn">>
 ): Promise<void> => {
   await updateDoc(doc(firestore, COL, id), {
     ...updates,
@@ -308,11 +308,29 @@ export const habilitarProducto = async (
   }
 };
 
-export const deshabilitarProducto = async (id: string): Promise<void> => {
-  await updateDoc(doc(firestore, COL, id), {
+export const deshabilitarProducto = async (mp: MayoristaProducto): Promise<void> => {
+  await updateDoc(doc(firestore, COL, mp.id), {
     habilitado: false,
     updatedAt: serverTimestamp(),
   });
+
+  // También deshabilitar en la colección productos para que desaparezca del catálogo
+  if (mp.productoId) {
+    try {
+      await updateDoc(doc(firestore, PRODUCTS_COLLECTION, mp.productoId), {
+        disabled: true,
+      });
+    } catch { /* si el doc no existe, ignorar */ }
+  }
+
+  // Actualizar caché local
+  const cached = readCache();
+  if (cached) {
+    const updated = cached.data.map((p) =>
+      p.id === mp.id ? { ...p, habilitado: false, updatedAt: new Date() } : p
+    );
+    writeCache(updated);
+  }
 };
 
 // ─── Preferencias de columnas (por usuario) ───────────────────────────────────

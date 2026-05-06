@@ -612,6 +612,16 @@ export default function ProductosPage() {
         setProducts(
           products.map((p) => (p.id === editingProduct.id ? updated : p)),
         );
+
+        // Si es producto de mayorista y se modificó lote/seDivideEn, sincronizar
+        const extra = productData as any;
+        if (editingProduct.id.startsWith("prod_") && extra.lote && extra.seDivideEn) {
+          const mayoristaId = editingProduct.id.replace("prod_", "");
+          await updateMayoristaProducto(mayoristaId, {
+            lote: extra.lote,
+            seDivideEn: extra.seDivideEn,
+          });
+        }
       } else {
         const newProduct = await productsApi.create(productData);
         setProducts([...products, newProduct]);

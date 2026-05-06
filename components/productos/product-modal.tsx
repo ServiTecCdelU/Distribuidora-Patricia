@@ -83,6 +83,10 @@ export function ProductModal({
   // Stock aditivo (solo en edición)
   const [stockToAdd, setStockToAdd] = useState(0);
 
+  // Lote y seDivideEn (solo para productos de mayorista: id empieza con "prod_")
+  const [lote, setLote] = useState<string>("");
+  const [seDivideEn, setSeDivideEn] = useState<string>("");
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -113,6 +117,8 @@ export function ProductModal({
       setNewCategoryInput("");
       setNewMarcaInput("");
       setStockToAdd(0);
+      setLote("");
+      setSeDivideEn("");
     }
   }, [open]);
 
@@ -130,6 +136,8 @@ export function ProductModal({
       });
       setImagePreview(product.imageUrl || null);
       setStockToAdd(0);
+      setLote((product as any).lote ? String((product as any).lote) : "");
+      setSeDivideEn((product as any).seDivideEn ? String((product as any).seDivideEn) : "");
     } else {
       setFormData({
         name: "",
@@ -143,6 +151,8 @@ export function ProductModal({
       });
       setImagePreview(null);
       setStockToAdd(0);
+      setLote("");
+      setSeDivideEn("");
     }
   }, [product, open]);
 
@@ -182,15 +192,25 @@ export function ProductModal({
     e.preventDefault();
     setLoading(true);
     try {
+      const loteNum = parseInt(lote) || 0;
+      const divideNum = parseInt(seDivideEn) || 0;
+      const isMayorista = !!product?.id?.startsWith("prod_");
+      // Si se modificó lote/seDivideEn, recalcular stock
       const finalStock = isEditing
-        ? formData.stock + stockToAdd
+        ? isMayorista && loteNum > 0 && divideNum > 0
+          ? Math.floor(loteNum / divideNum)
+          : formData.stock + stockToAdd
         : formData.stock;
       await onSave({
         ...formData,
         description: formData.description || "",
         imageUrl: formData.imageUrl || "",
         stock: finalStock,
-      });
+        // Campos extra para mayorista (se procesan en handleSave del padre)
+        ...(isMayorista && loteNum > 0 && divideNum > 0
+          ? { lote: loteNum, seDivideEn: divideNum }
+          : {}),
+      } as any);
     } finally {
       setLoading(false);
     }
@@ -206,6 +226,10 @@ export function ProductModal({
   };
 
   const isEditing = !!product;
+  const isMayorista = !!product?.id?.startsWith("prod_");
+  const loteNum = parseInt(lote) || 0;
+  const divideNum = parseInt(seDivideEn) || 0;
+  const porcionesCalc = loteNum > 0 && divideNum > 0 ? Math.floor(loteNum / divideNum) : null;
   const isValid =
     formData.name.trim() && formData.category && formData.price > 0;
 
@@ -621,6 +645,52 @@ export function ProductModal({
               className="hidden"
             />
           </div>
+
+          {/* Lote y seDivideEn — solo para productos de mayorista en edición */}
+          {isEditing && isMayorista && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Lote mayorista</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="lote-edit" className="text-xs text-muted-foreground">Lote total</Label>
+                    <Input
+                      id="lote-edit"
+                      type="number"
+                      min="1"
+                      placeholder="Ej: 30"
+                      value={lote}
+                      onChange={(e) => setLote(e.target.value)}
+                      className="h-10"
+                    />
+                    <p className="text-xs text-muted-foreground">Unidades que entran</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="divide-edit" className="text-xs text-muted-foreground">Se divide en</Label>
+                    <Input
+                      id="divide-edit"
+                      type="number"
+                      min="1"
+                      placeholder="Ej: 10"
+                      value={seDivideEn}
+                      onChange={(e) => setSeDivideEn(e.target.value)}
+                      className="h-10"
+                    />
+                    <p className="text-xs text-muted-foreground">Unidades por porción</p>
+                  </div>
+                </div>
+                {porcionesCalc !== null && (
+                  <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 p-3 text-center">
+                    <p className="text-xl font-bold text-teal-600">{porcionesCalc}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      porciones → stock se actualizará a <strong>{porcionesCalc}</strong>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Footer */}
           <div className="flex justify-end gap-3 pt-2 border-t border-border/50">
