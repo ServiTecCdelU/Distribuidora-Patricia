@@ -279,8 +279,8 @@ export function useCart(role: UserRole, userEmail?: string) {
           clientsApi.getAll(),
           sellersApi.getAll(),
         ]);
-        // Convertir MayoristaProducto a Product (stock=9999 para no restringir pedidos)
-        const productsData = mayoristaData.map((p) => ({
+        // Convertir MayoristaProducto a Product (solo habilitados, stock=9999 para no restringir pedidos)
+        const productsData = mayoristaData.filter((p) => p.habilitado).map((p) => ({
           id: p.id,
           name: p.nombre,
           description: p.codigo,
