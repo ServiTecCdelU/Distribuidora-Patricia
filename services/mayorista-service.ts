@@ -295,6 +295,17 @@ export const habilitarProducto = async (
     precioVenta: precio,
     updatedAt: serverTimestamp(),
   });
+
+  // Actualizar caché local para que el refresh no revierta el estado
+  const cached = readCache();
+  if (cached) {
+    const updated = cached.data.map((p) =>
+      p.id === mp.id
+        ? { ...p, habilitado: true, lote, seDivideEn, productoId, precioVenta: precio, updatedAt: new Date() }
+        : p
+    );
+    writeCache(updated);
+  }
 };
 
 export const deshabilitarProducto = async (id: string): Promise<void> => {

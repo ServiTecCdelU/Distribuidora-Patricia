@@ -1460,228 +1460,84 @@ export default function ProductosPage() {
                   })}
                 </div>
               ) : (
-                /* Vista Lista - Responsive */
-                <div className="space-y-2">
-                  {/* Header - solo en md+ */}
-                  <div className="hidden md:flex items-center gap-3 px-4 py-2 text-xs font-medium text-muted-foreground">
-                    <button
-                      onClick={toggleSelectAll}
-                      className={cn(
-                        "h-5 w-5 flex-shrink-0 rounded border flex items-center justify-center transition-colors",
-                        selectedProducts.length === filteredProducts.length &&
-                          selectedProducts.length > 0
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "bg-background border-border hover:border-primary",
-                      )}
-                    >
-                      {selectedProducts.length === filteredProducts.length &&
-                        selectedProducts.length > 0 && (
-                          <Check className="h-3 w-3" />
-                        )}
-                    </button>
-                    <span className="flex-1">Producto</span>
-                    <span className="w-28">Categoría</span>
-                    <span className="w-24 text-right">Precio</span>
-                    <span className="w-20 text-right">Stock</span>
-                    <span className="w-28 text-right">Acciones</span>
-                  </div>
-
-                  {/* Items */}
-                  {paginatedProducts.map((product) => {
-                    const isSelected = selectedProducts.includes(product.id);
-                    const stockColor = getStockColor(product.stock);
-                    const listFallback = "/logo.png";
-
-                    return (
-                      <div
-                        key={product.id}
-                        className={cn(
-                          "rounded-xl border bg-card transition-all hover:shadow-md p-2 md:p-4",
-                          isSelected
-                            ? "border-primary border-2 ring-1 ring-primary/20"
-                            : "border-border",
-                        )}
-                      >
-                        <div className="flex items-center gap-2 md:gap-3">
-                          {/* Checkbox */}
-                          <button
-                            onClick={() => toggleProductSelection(product.id)}
-                            className={cn(
-                              "h-4 w-4 md:h-5 md:w-5 flex-shrink-0 rounded border flex items-center justify-center transition-colors",
-                              isSelected
-                                ? "bg-primary border-primary text-primary-foreground"
-                                : "bg-background border-border hover:border-primary",
-                            )}
-                          >
-                            {isSelected && <Check className="h-2.5 w-2.5 md:h-3 md:w-3" />}
-                          </button>
-
-                          {/* Imagen */}
-                          <img
-                            src={product.imageUrl || listFallback}
-                            alt={product.name}
-                            className="h-9 w-9 md:h-14 md:w-14 rounded-lg object-cover flex-shrink-0"
-                            onError={(e) => {
-                              e.currentTarget.src = listFallback;
-                            }}
-                          />
-
-                          {/* Nombre + descripción (desktop) */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <h4 className="font-medium text-foreground text-xs md:text-base leading-tight">
-                                {product.name}
-                              </h4>
-                              {(product as any).sinTacc && (
-                                <WheatOff className="h-3 w-3 text-green-600 flex-shrink-0" title="Sin TACC" />
-                              )}
-                              {(product as any).disabled && (
-                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 hidden sm:inline-flex">
-                                  Deshabilitado
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate hidden sm:block">
-                              {product.description}
-                            </p>
-                          </div>
-
-                          {/* Precio (siempre visible) */}
-                          <span className="font-semibold text-primary text-xs md:text-sm flex-shrink-0 w-16 md:w-24 text-right">
-                            {formatCurrency(product.price)}
-                          </span>
-
-                          {/* Stock badge (siempre visible) */}
-                          <div className="flex-shrink-0 w-14 md:w-20 text-right">
-                            <Badge
-                              variant={stockColor === "destructive" ? "destructive" : stockColor === "warning" ? "secondary" : "outline"}
+                /* Vista Lista — tabla compacta estilo mayorista */
+                <div className="rounded-2xl border overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 border-b">
+                        <tr>
+                          <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Código</th>
+                          <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Descripción</th>
+                          <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Categoría</th>
+                          <th className="text-right px-3 py-3 font-semibold text-muted-foreground whitespace-nowrap">Precio</th>
+                          <th className="text-right px-3 py-3 font-semibold text-muted-foreground">Stock</th>
+                          <th className="text-center px-3 py-3 font-semibold text-muted-foreground">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {paginatedProducts.map((product) => {
+                          const stockColor = getStockColor(product.stock);
+                          const isDisabled = (product as any).disabled;
+                          return (
+                            <tr
+                              key={product.id}
                               className={cn(
-                                "font-medium text-[10px] md:text-xs px-1 md:px-2",
-                                stockColor === "warning" && "bg-amber-100 text-amber-800 border-amber-200",
-                                stockColor === "success" && "bg-green-100 text-green-800 border-green-200",
+                                "hover:bg-muted/20 transition-colors",
+                                isDisabled && "opacity-50",
                               )}
                             >
-                              {product.stock}
-                            </Badge>
-                          </div>
-
-                          {/* Acciones mobile (editar + toggle) */}
-                          <div className="flex items-center gap-0.5 md:hidden flex-shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleEdit(product)}
-                              title="Editar"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            {(product as any).disabled ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-green-600"
-                                onClick={() => handleEnable(product)}
-                                title="Habilitar"
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-amber-600"
-                                onClick={() => handleDeactivate(product)}
-                                title="Deshabilitar"
-                              >
-                                <EyeOff className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-
-                          {/* Desktop: categoría, precio, stock, acciones */}
-                          <div className="hidden md:flex items-center gap-3 flex-shrink-0">
-                            <div className="w-28">
-                              <Badge variant="outline" className="text-xs">
-                                {product.category}
-                              </Badge>
-                              {(product as any).marca && (
-                                <div className="text-xs text-muted-foreground mt-1 capitalize">
-                                  {(product as any).marca}
-                                </div>
-                              )}
-                            </div>
-                            <div className="w-24 text-right">
-                              <span className="font-semibold text-primary text-sm">
-                                {formatCurrency(product.price)}
-                              </span>
-                            </div>
-                            <div className="w-20 text-right">
-                              <Badge
-                                variant={
-                                  stockColor === "destructive"
-                                    ? "destructive"
-                                    : stockColor === "warning"
-                                      ? "secondary"
-                                      : "outline"
-                                }
-                                className={cn(
-                                  "font-medium",
-                                  stockColor === "warning" &&
-                                    "bg-amber-100 text-amber-800 border-amber-200",
-                                  stockColor === "success" &&
-                                    "bg-green-100 text-green-800 border-green-200",
+                              <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                                {product.description || "—"}
+                              </td>
+                              <td className="px-3 py-2.5 font-medium max-w-[260px] truncate">
+                                <span>{product.name}</span>
+                                {isDisabled && (
+                                  <Badge variant="destructive" className="ml-2 text-[10px] px-1.5 py-0">Deshabilitado</Badge>
                                 )}
-                              >
-                                {product.stock} uds
-                              </Badge>
-                            </div>
-                            <div className="flex items-center justify-end gap-1 w-28">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleViewHistory(product)}
-                                title="Historial"
-                              >
-                                <History className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleEdit(product)}
-                                title="Editar"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              {(product as any).disabled ? (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-green-600 hover:text-green-700"
-                                  onClick={() => handleEnable(product)}
-                                  title="Habilitar producto"
+                              </td>
+                              <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                                {product.category}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-semibold text-teal-600 whitespace-nowrap">
+                                {formatCurrency(product.price)}
+                              </td>
+                              <td className="px-3 py-2.5 text-right">
+                                <Badge
+                                  variant={stockColor === "destructive" ? "destructive" : stockColor === "warning" ? "secondary" : "outline"}
+                                  className={cn(
+                                    "text-xs font-medium",
+                                    stockColor === "warning" && "bg-amber-100 text-amber-800 border-amber-200",
+                                    stockColor === "success" && "bg-green-100 text-green-800 border-green-200",
+                                  )}
                                 >
-                                  <CheckCircle2 className="h-4 w-4" />
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-amber-600 hover:text-amber-700"
-                                  onClick={() => handleDeactivate(product)}
-                                  title="Deshabilitar"
-                                >
-                                  <EyeOff className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                                  {product.stock}
+                                </Badge>
+                              </td>
+                              <td className="px-3 py-2.5 text-center">
+                                <div className="flex items-center justify-center gap-0.5">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleViewHistory(product)} title="Historial">
+                                    <History className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(product)} title="Editar">
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  {isDisabled ? (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700" onClick={() => handleEnable(product)} title="Habilitar">
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  ) : (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600 hover:text-amber-700" onClick={() => handleDeactivate(product)} title="Deshabilitar">
+                                      <EyeOff className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </>
