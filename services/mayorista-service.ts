@@ -3,9 +3,11 @@ import {
   doc,
   getDocs,
   getDoc,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
@@ -354,6 +356,17 @@ export const deshabilitarProducto = async (mp: MayoristaProducto): Promise<void>
     );
     writeCache(updated);
   }
+};
+
+// Sincroniza habilitado en mayorista_productos dado un productoId (relación inversa)
+export const sincronizarHabilitadoEnMayorista = async (productoId: string, habilitado: boolean): Promise<void> => {
+  const q = query(collection(firestore, COL), where("productoId", "==", productoId));
+  const snap = await getDocs(q);
+  if (snap.empty) return;
+  await Promise.all(
+    snap.docs.map((d) => updateDoc(d.ref, { habilitado, updatedAt: serverTimestamp() }))
+  );
+  invalidateMayoristaCache();
 };
 
 // ─── Preferencias de columnas (por usuario) ───────────────────────────────────

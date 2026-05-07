@@ -26,6 +26,7 @@ import {
   getMayoristaProductos,
   applyGananciaToProducts,
   updateProductoPrecioVenta,
+  sincronizarHabilitadoEnMayorista,
 } from "@/services/mayorista-service";
 import {
   Plus,
@@ -505,6 +506,9 @@ export default function ProductosPage() {
         disabled: false,
       } as any);
 
+      // Sincronizar con mayorista_productos
+      await sincronizarHabilitadoEnMayorista(product.id, true);
+
       setProducts((prev) =>
         prev.map((p) => (p.id === product.id ? { ...p, disabled: false } : p)),
       );
@@ -527,6 +531,9 @@ export default function ProductosPage() {
       await productsApi.update(productToDeactivate.id, {
         disabled: true,
       } as any);
+
+      // Sincronizar con mayorista_productos
+      await sincronizarHabilitadoEnMayorista(productToDeactivate.id, false);
 
       // Actualizar estado local
       setProducts((prev) =>
@@ -565,6 +572,11 @@ export default function ProductosPage() {
         selectedProducts.map((id) =>
           productsApi.update(id, { disabled: true } as any),
         ),
+      );
+
+      // Sincronizar con mayorista_productos
+      await Promise.all(
+        selectedProducts.map((id) => sincronizarHabilitadoEnMayorista(id, false))
       );
 
       const updatedProducts = products.map((p) =>
@@ -644,9 +656,9 @@ export default function ProductosPage() {
     return products.filter((product) => {
       if ((product as any).disabled) return false;
       const matchesSearch =
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (product.description || "").toLowerCase().includes(searchQuery.toLowerCase());
+        (product.name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (product.category ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (product.description ?? "").toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesCategory =
         categoryFilter === "all" || product.category === categoryFilter;
