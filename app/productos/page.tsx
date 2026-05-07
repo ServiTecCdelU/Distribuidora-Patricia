@@ -157,7 +157,7 @@ export default function ProductosPage() {
   const [marcaFilter, setMarcaFilter] = useState<MarcaFilter>("all");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
   const [sinTaccFilter, setSinTaccFilter] = useState<SinTaccFilter>("all");
-  const [showDisabled, setShowDisabled] = useState(false);
+  const [habilitadosIds, setHabilitadosIds] = useState<Set<string>>(new Set());
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -182,9 +182,18 @@ export default function ProductosPage() {
     let mounted = true;
     const doLoad = async () => {
       try {
-        const data = await productsApi.getAll();
+        const [data, mayoristaData] = await Promise.all([
+          productsApi.getAll(),
+          getMayoristaProductos(),
+        ]);
         if (!mounted) return;
         setProducts(data);
+        const ids = new Set(
+          mayoristaData
+            .filter((p) => p.habilitado && p.productoId)
+            .map((p) => p.productoId!)
+        );
+        setHabilitadosIds(ids);
       } catch (error) {
         if (!mounted) return;
         toast.error("Error al cargar productos");
@@ -515,6 +524,7 @@ export default function ProductosPage() {
       setProducts((prev) =>
         prev.map((p) => (p.id === product.id ? { ...p, disabled: false } : p)),
       );
+      setHabilitadosIds((prev) => new Set([...prev, product.id]));
 
       toast.success(`"${product.name}" habilitado`);
     } catch (error) {
@@ -544,6 +554,11 @@ export default function ProductosPage() {
           p.id === productToDeactivate.id ? { ...p, disabled: true } : p,
         ),
       );
+      setHabilitadosIds((prev) => {
+        const next = new Set(prev);
+        next.delete(productToDeactivate.id);
+        return next;
+      });
 
       toast.success(`"${productToDeactivate.name}" deshabilitado`);
     } catch (error) {
@@ -556,28 +571,6 @@ export default function ProductosPage() {
 
   const handleBulkDeactivate = () => {
     setBulkDeactivateDialogOpen(true);
-  };
-
-  const handleBulkEnable = async () => {
-    try {
-      await Promise.all(
-        selectedProducts.map((id) =>
-          productsApi.update(id, { disabled: false } as any)
-        )
-      );
-      await Promise.all(
-        selectedProducts.map((id) => sincronizarHabilitadoEnMayorista(id, true))
-      );
-      setProducts((prev) =>
-        prev.map((p) =>
-          selectedProducts.includes(p.id) ? { ...p, disabled: false } : p
-        )
-      );
-      toast.success(`${selectedProducts.length} productos habilitados`);
-      setSelectedProducts([]);
-    } catch {
-      toast.error("Error al habilitar productos");
-    }
   };
 
   const confirmBulkDeactivate = async () => {
@@ -679,9 +672,7 @@ export default function ProductosPage() {
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const isDisabled = (product as any).disabled;
-      if (isDisabled && !showDisabled) return false;
-      if (!isDisabled && showDisabled) return false;
+      if (!habilitadosIds.has(product.id)) return false;
       const matchesSearch =
         (product.name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (product.category ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -744,7 +735,7 @@ export default function ProductosPage() {
     marcaFilter,
     sinTaccFilter,
     stockFilter,
-    showDisabled,
+    habilitadosIds,
   ]);
 
   const stats = useMemo(() => {
@@ -771,7 +762,7 @@ export default function ProductosPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, categoryFilter, priceFilter, marcaFilter, stockFilter, sinTaccFilter, showDisabled]);
+  }, [searchQuery, categoryFilter, priceFilter, marcaFilter, stockFilter, sinTaccFilter, habilitadosIds]);
 
   const paginatedProducts = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -962,21 +953,6 @@ export default function ProductosPage() {
               >
                 <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Valor Inventario</span>
-              </Button>
-
-              <Button
-                variant={showDisabled ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => setShowDisabled(!showDisabled)}
-                className="gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3"
-                title={showDisabled ? "Ver habilitados" : "Ver deshabilitados"}
-              >
-                {showDisabled ? (
-                  <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                ) : (
-                  <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                )}
-                <span className="hidden sm:inline">{showDisabled ? "Habilitados" : "Deshabilitados"}</span>
               </Button>
 
               <Button
@@ -1268,29 +1244,16 @@ export default function ProductosPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {showDisabled ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 text-green-600 border-green-300 hover:bg-green-50"
-                onClick={handleBulkEnable}
-              >
-                <Eye className="h-4 w-4" />
-                <span className="hidden sm:inline">Habilitar</span>
-                <span className="sm:hidden">Activar</span>
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={handleBulkDeactivate}
-              >
-                <EyeOff className="h-4 w-4" />
-                <span className="hidden sm:inline">Deshabilitar</span>
-                <span className="sm:hidden">Sacar</span>
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleBulkDeactivate}
+            >
+              <EyeOff className="h-4 w-4" />
+              <span className="hidden sm:inline">Deshabilitar</span>
+              <span className="sm:hidden">Sacar</span>
+            </Button>
           </div>
         </div>
       )}
@@ -1315,19 +1278,15 @@ export default function ProductosPage() {
                     No se encontraron productos
                   </h3>
                   <p className="text-muted-foreground text-sm mb-6">
-                    {showDisabled
-                      ? "No hay productos deshabilitados"
-                      : searchQuery || activeFilterCount > 0
+                    {searchQuery || activeFilterCount > 0
                       ? "Prueba ajustando tus filtros"
-                      : "Comienza agregando tu primer producto"}
+                      : "No hay productos habilitados en el catálogo"}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    {!showDisabled && (
-                      <Button onClick={handleCreate} className="gap-2">
-                        <Plus className="h-4 w-4" />
-                        Agregar
-                      </Button>
-                    )}
+                    <Button onClick={handleCreate} className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Agregar
+                    </Button>
                     {(searchQuery || activeFilterCount > 0) && (
                       <Button variant="outline" onClick={clearFilters}>
                         Limpiar
