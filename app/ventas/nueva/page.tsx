@@ -480,12 +480,14 @@ const ProductListItem = memo(function ProductListItem({
       )}
       onClick={() => onAdd(product)}
     >
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{product.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {esMayorista ? `local: ${stockDisplay}` : `${stockDisplay} uds`} · {formatCurrency(product.price)}
-        </p>
-      </div>
+      {product.codigo && (
+        <span className="text-xs text-muted-foreground font-mono shrink-0 w-14 truncate">{product.codigo}</span>
+      )}
+      <p className="flex-1 text-sm font-medium truncate min-w-0">{product.name}</p>
+      <span className="text-xs text-muted-foreground shrink-0">
+        {esMayorista ? `L:${stockDisplay}` : `${stockDisplay}u`}
+      </span>
+      <span className="text-xs font-semibold shrink-0">{formatCurrency(product.price)}</span>
       {quantity > 0 && (
         <span className="h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">
           {quantity}
