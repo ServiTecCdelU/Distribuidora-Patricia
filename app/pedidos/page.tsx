@@ -13,6 +13,7 @@ import type { Order, OrderStatus, Client, Seller, MayoristaProducto } from "@/li
 import { Package, Search, User, Filter, X, Loader2, Navigation, ClipboardList, ShoppingCart, Warehouse, Clock, CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { getSalesPendientesMayorista } from "@/services/sales-service";
 import { getMayoristaProductos } from "@/services/mayorista-service";
+import * as XLSX from "xlsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -594,14 +595,21 @@ export default function PedidosPage() {
         "Total estimado ($)": filas.reduce((s, r) => s + r["Total estimado ($)"], 0),
       });
 
-      const XLSX = await import("xlsx");
       const ws = XLSX.utils.json_to_sheet(filas);
-      // Ancho de columnas
       ws["!cols"] = [{ wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 18 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Pedido Mayorista");
       const fecha = new Date().toLocaleDateString("es-AR").replace(/\//g, "-");
-      XLSX.writeFile(wb, `pedido-mayorista-${fecha}.xlsx`);
+      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([wbout], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pedido-mayorista-${fecha}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
       toast.success("Excel descargado");
     } catch {
       toast.error("Error al generar el Excel");
