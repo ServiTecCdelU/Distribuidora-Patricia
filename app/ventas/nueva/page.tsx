@@ -472,28 +472,30 @@ const ProductListItem = memo(function ProductListItem({
   const esMayorista = product.stockLocal !== undefined;
   const stockDisplay = esMayorista ? (product.stockLocal ?? 0) : product.stock;
   return (
-    <div
+    <tr
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-all hover:bg-muted/40",
+        "cursor-pointer transition-colors hover:bg-muted/40",
         disabled && "opacity-60",
-        quantity > 0 ? "border-primary bg-primary/5" : "border-border",
+        quantity > 0 ? "bg-primary/5" : "",
       )}
       onClick={() => onAdd(product)}
     >
-      {product.codigo && (
-        <span className="text-xs text-muted-foreground font-mono shrink-0 w-14 truncate">{product.codigo}</span>
-      )}
-      <p className="flex-1 text-sm font-medium truncate min-w-0">{product.name}</p>
-      <span className="text-xs text-muted-foreground shrink-0">
-        {esMayorista ? `L:${stockDisplay}` : `${stockDisplay}u`}
-      </span>
-      <span className="text-xs font-semibold shrink-0">{formatCurrency(product.price)}</span>
-      {quantity > 0 && (
-        <span className="h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">
-          {quantity}
-        </span>
-      )}
-    </div>
+      <td className="py-1.5 pl-3 pr-2 text-xs text-muted-foreground font-mono whitespace-nowrap">{product.codigo ?? "—"}</td>
+      <td className="py-1.5 px-2 text-sm font-medium max-w-0 w-full">
+        <span className="block truncate">{product.name}</span>
+      </td>
+      <td className="py-1.5 px-2 text-xs text-muted-foreground text-right whitespace-nowrap">
+        {esMayorista ? `L: ${stockDisplay}` : `${stockDisplay} u`}
+      </td>
+      <td className="py-1.5 px-2 text-xs font-semibold text-right whitespace-nowrap">{formatCurrency(product.price)}</td>
+      <td className="py-1.5 pl-2 pr-3 text-center w-8">
+        {quantity > 0 && (
+          <span className="inline-flex h-5 w-5 rounded-full bg-primary text-primary-foreground items-center justify-center text-[10px] font-bold">
+            {quantity}
+          </span>
+        )}
+      </td>
+    </tr>
   );
 });
 
@@ -513,17 +515,30 @@ function ProductGrid({
   }, [cart]);
 
   return (
-    <div className="space-y-1">
-      {products.map((product) => (
-        <ProductListItem
-          key={product.id}
-          product={product}
-          quantity={cartMap.get(product.id) || 0}
-          onAdd={addToCart}
-          formatCurrency={formatCurrency}
-          disabled={disabled}
-        />
-      ))}
+    <div className="rounded-xl border border-border overflow-hidden">
+      <table className="w-full table-fixed border-collapse">
+        <thead>
+          <tr className="bg-muted/50 text-xs text-muted-foreground">
+            <th className="py-1.5 pl-3 pr-2 text-left font-medium w-20">Código</th>
+            <th className="py-1.5 px-2 text-left font-medium">Nombre</th>
+            <th className="py-1.5 px-2 text-right font-medium w-20">Stock</th>
+            <th className="py-1.5 px-2 text-right font-medium w-28">Precio</th>
+            <th className="py-1.5 pl-2 pr-3 w-8" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {products.map((product) => (
+            <ProductListItem
+              key={product.id}
+              product={product}
+              quantity={cartMap.get(product.id) || 0}
+              onAdd={addToCart}
+              formatCurrency={formatCurrency}
+              disabled={disabled}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
