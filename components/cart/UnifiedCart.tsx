@@ -200,132 +200,109 @@ export function UnifiedCart({ role, state, actions, onConfirmSale, allowDiscount
 
       {/* Cart items — step 1 for admin/seller, always visible for public */}
       {(role === null || cartStep === "products") && (
-      <div className="flex-1 overflow-y-auto space-y-2 pb-3 max-h-[40vh] sm:max-h-[280px]">
-        {cart.map((item) => {
-          const esMayorista = item.product.stockLocal !== undefined;
-          const stockLocal = item.product.stockLocal ?? 0;
-          const cantidadStockLocal = Math.min(item.quantity, stockLocal);
-          const cantidadPendiente = Math.max(0, item.quantity - stockLocal);
-          const remaining = item.product.stock - item.quantity;
-          return (
-            <div
-              key={item.product.id}
-              className="group relative flex items-start gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-card border border-border/50 hover:border-border transition-all"
-            >
-              <div className="flex-1 min-w-0 space-y-1.5">
-                <div className="flex items-start justify-between gap-1">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-xs sm:text-sm text-foreground truncate leading-tight">
-                      {item.product.name}
-                    </p>
-                    <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
-                      {actions.formatCurrency(item.product.price)} c/u
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/5 shrink-0"
-                    onClick={() => actions.removeFromCart(item.product.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <div className="flex items-center gap-0.5 sm:gap-1 bg-muted/30 rounded-lg p-0.5 border border-primary/20">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 sm:h-9 sm:w-9 rounded-md hover:bg-background"
-                      onClick={() => actions.updateQuantity(item.product.id, -1)}
-                      disabled={item.quantity <= 1}
-                    >
-                      <Minus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    </Button>
-                    <Input
-                      type="number"
-                      min="1"
-                      max={item.product.stock}
-                      value={item.quantity}
-                      onChange={(e) => actions.setQuantityDirect(item.product.id, parseInt(e.target.value) || 1)}
-                      className="h-8 w-10 sm:h-9 sm:w-16 text-center text-xs sm:text-sm font-semibold px-0.5 sm:px-1 bg-background/50 border-border/50"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 sm:h-9 sm:w-9 rounded-md hover:bg-background"
-                      onClick={() => actions.updateQuantity(item.product.id, 1)}
-                      disabled={!esMayorista && item.quantity >= item.product.stock}
-                    >
-                      <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    </Button>
-                  </div>
-                  <div className="flex-1 flex items-center justify-between gap-1">
-                    {esMayorista ? (
-                      <div className="flex flex-col gap-0.5">
-                        <span className={cn("text-[10px] font-medium", cantidadStockLocal > 0 ? "text-emerald-600" : "text-muted-foreground")}>
-                          Local: {cantidadStockLocal}/{item.quantity}
-                        </span>
-                        {cantidadPendiente > 0 && (
-                          <span className="text-[10px] font-medium text-amber-600">
-                            Mayorista: {cantidadPendiente}
-                          </span>
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="overflow-y-auto max-h-[40vh] sm:max-h-[280px]">
+          <table className="w-full table-fixed border-collapse text-xs">
+            <thead className="sticky top-0 z-10 bg-muted/70">
+              <tr className="text-muted-foreground border-b border-border">
+                <th className="py-1.5 pl-3 pr-1 text-left font-medium">Producto</th>
+                <th className="py-1.5 px-1 text-right font-medium w-20">P. unit</th>
+                <th className="py-1.5 px-1 text-center font-medium w-[6.5rem]">Cant.</th>
+                <th className="py-1.5 px-1 text-right font-medium w-20">Total</th>
+                <th className="py-1.5 pl-1 pr-2 w-7" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {cart.map((item) => {
+                const esMayorista = item.product.stockLocal !== undefined;
+                const stockLocal = item.product.stockLocal ?? 0;
+                const cantidadStockLocal = Math.min(item.quantity, stockLocal);
+                const cantidadPendiente = Math.max(0, item.quantity - stockLocal);
+                const remaining = item.product.stock - item.quantity;
+                const lineTotal = item.product.price * item.quantity;
+                const lineFinal = item.itemDiscount ? lineTotal * (1 - item.itemDiscount / 100) : lineTotal;
+                return (
+                  <React.Fragment key={item.product.id}>
+                    {/* Fila principal */}
+                    <tr className="hover:bg-muted/20 transition-colors">
+                      <td className="py-1.5 pl-3 pr-1">
+                        <p className="font-medium truncate leading-tight">{item.product.name}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {esMayorista
+                            ? <span className={cn(cantidadStockLocal > 0 ? "text-emerald-600" : "text-muted-foreground")}>
+                                L:{cantidadStockLocal}/{item.quantity}{cantidadPendiente > 0 && <span className="text-amber-600"> · May:{cantidadPendiente}</span>}
+                              </span>
+                            : <span className={remaining > 15 ? "text-emerald-600" : "text-destructive"}>Stock: {remaining}</span>
+                          }
+                        </p>
+                      </td>
+                      <td className="py-1.5 px-1 text-right text-muted-foreground whitespace-nowrap align-middle">
+                        {actions.formatCurrency(item.product.price)}
+                      </td>
+                      <td className="py-1.5 px-1 align-middle">
+                        <div className="flex items-center justify-center gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md"
+                            onClick={() => actions.updateQuantity(item.product.id, -1)} disabled={item.quantity <= 1}>
+                            <Minus className="h-2.5 w-2.5" />
+                          </Button>
+                          <Input
+                            type="number" min="1" max={item.product.stock}
+                            value={item.quantity}
+                            onChange={(e) => actions.setQuantityDirect(item.product.id, parseInt(e.target.value) || 1)}
+                            className="h-6 w-9 text-center text-xs font-semibold px-0.5 border-border/50"
+                          />
+                          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md"
+                            onClick={() => actions.updateQuantity(item.product.id, 1)}
+                            disabled={!esMayorista && item.quantity >= item.product.stock}>
+                            <Plus className="h-2.5 w-2.5" />
+                          </Button>
+                        </div>
+                      </td>
+                      <td className="py-1.5 px-1 text-right font-semibold whitespace-nowrap align-middle">
+                        {item.itemDiscount ? (
+                          <span className="text-emerald-600">{actions.formatCurrency(lineFinal)}</span>
+                        ) : (
+                          actions.formatCurrency(lineTotal)
                         )}
-                      </div>
-                    ) : (
-                      <span className={cn("text-[11px] sm:text-xs font-medium", remaining > 15 ? "text-emerald-600" : "text-destructive")}>
-                        Stock: {remaining}
-                      </span>
+                      </td>
+                      <td className="py-1.5 pl-1 pr-2 text-center align-middle">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={() => actions.removeFromCart(item.product.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </td>
+                    </tr>
+                    {/* Fila descuento — solo admin/seller */}
+                    {role !== null && (
+                      <tr className="bg-muted/10">
+                        <td colSpan={4} className="py-1 pl-3 pr-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-muted-foreground">Dto.:</span>
+                            <Input
+                              type="number" min="0" max="30" placeholder="0"
+                              value={item.itemDiscount || ""}
+                              onChange={(e) => actions.setItemDiscount(item.product.id, Number(e.target.value) || 0)}
+                              className="h-5 w-10 text-center text-[10px] px-0.5"
+                              disabled={hasGeneralDiscount}
+                              title={hasGeneralDiscount ? "Quitá el descuento general para aplicar por producto" : ""}
+                            />
+                            <span className="text-[10px] text-muted-foreground">%</span>
+                            {item.itemDiscount ? (
+                              <span className="text-[10px] font-semibold text-emerald-600">
+                                −{actions.formatCurrency(lineTotal * item.itemDiscount / 100)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td />
+                      </tr>
                     )}
-                    <div className="text-right">
-                      {item.itemDiscount ? (
-                        <>
-                          <span className="text-[10px] sm:text-xs line-through text-muted-foreground block">
-                            {actions.formatCurrency(item.product.price * item.quantity)}
-                          </span>
-                          <span className="text-xs sm:text-sm font-bold text-emerald-600">
-                            {actions.formatCurrency(item.product.price * item.quantity * (1 - item.itemDiscount / 100))}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-xs sm:text-sm font-bold text-foreground">
-                          {actions.formatCurrency(item.product.price * item.quantity)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                {/* Descuento por ítem — solo para admin/seller; bloqueado si hay dto. general */}
-                {role !== null && (
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground shrink-0">Dto.:</span>
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="30"
-                          placeholder="0"
-                          value={item.itemDiscount || ""}
-                          onChange={(e) => actions.setItemDiscount(item.product.id, Number(e.target.value) || 0)}
-                          className="h-7 w-12 text-center text-xs px-1"
-                          disabled={hasGeneralDiscount}
-                          title={hasGeneralDiscount ? "Quitá el descuento general para aplicar por producto" : ""}
-                        />
-                        <span className="text-xs text-muted-foreground">%</span>
-                      </div>
-                    </div>
-                    {item.itemDiscount ? (
-                      <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
-                        -{actions.formatCurrency(item.product.price * item.quantity * item.itemDiscount / 100)}
-                      </span>
-                    ) : null}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
       )}
 
