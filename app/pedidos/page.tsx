@@ -9,10 +9,8 @@ import { DataTableSkeleton } from "@/components/ui/data-table-skeleton";
 import { Input } from "@/components/ui/input";
 import { ClientModal } from "@/components/clientes/client-modal";
 import { ordersApi, salesApi, clientsApi, paymentsApi, sellersApi } from "@/lib/api";
-import type { Order, OrderStatus, Client, Seller, MayoristaProducto } from "@/lib/types";
+import type { Order, OrderStatus, Client, Seller } from "@/lib/types";
 import { Package, Search, User, Filter, X, Loader2, Navigation, ClipboardList, ShoppingCart, Warehouse, Clock, CheckCircle2, FileSpreadsheet } from "lucide-react";
-import { getSalesPendientesMayorista } from "@/services/sales-service";
-import { getMayoristaProductos } from "@/services/mayorista-service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -517,92 +515,39 @@ export default function PedidosPage() {
     setSelectedOrder(null);
   }, []);
 
-  const handleDescargarExcel = useCallback(async () => {
+  const handleDescargarExcel = useCallback(() => {
     setGenerandoExcel(true);
     try {
-      const [ventas, productos, ordenes] = await Promise.all([
-        getSalesPendientesMayorista(),
-        getMayoristaProductos(),
-        ordersApi.getAll(),
-      ]);
+      // Usar orders ya cargados en estado — sin fetches adicionales
+      const activos = orders.filter((o) => o.status !== "completed");
 
-      // Construir mapa de productos mayoristas
-      const productosMap = new Map<string, MayoristaProducto>();
-      productos.forEach((p) => {
-        productosMap.set(p.id, p);
-        if (p.productoId) productosMap.set(p.productoId, p);
-      });
-
-      // Acumular déficit
+      // Consolidar items por nombre de producto
       const acum = new Map<string, number>();
-
-      // Fuente 1: ventas con cantidadPendienteMayorista
-      for (const venta of ventas) {
-        for (const item of (venta.items ?? []) as any[]) {
-          const pendiente = item.cantidadPendienteMayorista ?? 0;
-          if (pendiente <= 0) continue;
-          acum.set(item.productId, (acum.get(item.productId) ?? 0) + pendiente);
-        }
-      }
-
-      // Fuente 2: órdenes activas con déficit de stockLocal
-      const ordenesActivas = ordenes.filter((o) => o.status !== "completed");
-      const totalPorProducto = new Map<string, number>();
-      for (const orden of ordenesActivas) {
+      for (const orden of activos) {
         for (const item of orden.items) {
-          const prod = productosMap.get(item.productId);
-          if (!prod) continue;
-          totalPorProducto.set(item.productId, (totalPorProducto.get(item.productId) ?? 0) + item.quantity);
+          acum.set(item.name, (acum.get(item.name) ?? 0) + item.quantity);
         }
       }
-      for (const [productId, totalNecesario] of totalPorProducto) {
-        const prod = productosMap.get(productId);
-        const stockLocal = prod?.stockLocal ?? 0;
-        const deficit = Math.max(0, totalNecesario - stockLocal);
-        if (deficit <= 0) continue;
-        acum.set(productId, (acum.get(productId) ?? 0) + deficit);
-      }
 
-      // Armar filas ordenadas
-      const filas = Array.from(acum.entries()).map(([productoId, unidadesPedidas]) => {
-        const prod = productosMap.get(productoId);
-        const unidadesPorBulto = prod?.unidadesPorBulto ?? 1;
-        const lotes = Math.ceil(unidadesPedidas / unidadesPorBulto);
-        const precioUnit = prod?.precioUnitarioMayorista ?? 0;
-        return {
-          nombre: prod?.nombre ?? productoId,
-          udsPedidas: unidadesPedidas,
-          lotes,
-          udsPorLote: unidadesPorBulto,
-          precioUnit,
-          total: lotes * unidadesPorBulto * precioUnit,
-        };
-      }).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-
-      if (filas.length === 0) {
-        toast.info("No hay productos pendientes de mayorista");
+      if (acum.size === 0) {
+        toast.info("No hay pedidos activos para descargar");
         return;
       }
 
-      // Totales
-      const totalLotes = filas.reduce((s, r) => s + r.lotes, 0);
-      const totalEstimado = filas.reduce((s, r) => s + r.total, 0);
+      const filas = Array.from(acum.entries())
+        .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
-      // Generar CSV con BOM para que Excel lo abra bien
+      // CSV con BOM para Excel en español (separador ;)
       const sep = ";";
       const esc = (v: string | number) =>
         typeof v === "string" ? `"${v.replace(/"/g, '""')}"` : String(v);
 
-      const cabecera = ["Producto", "Uds. pedidas", "Lotes a pedir", "Uds. por lote", "Precio unit.", "Total estimado ($)"]
-        .map(esc).join(sep);
+      const cabecera = ["Producto", "Unidades totales pedidas"].map(esc).join(sep);
+      const cuerpo = filas.map((f) => [f.nombre, f.cantidad].map(esc).join(sep));
+      const pie = ["TOTAL", filas.reduce((s, r) => s + r.cantidad, 0)].map(esc).join(sep);
 
-      const cuerpo = filas.map(f =>
-        [f.nombre, f.udsPedidas, f.lotes, f.udsPorLote, f.precioUnit, f.total].map(esc).join(sep)
-      );
-
-      const pieTotales = ["TOTAL", "", totalLotes, "", "", totalEstimado].map(esc).join(sep);
-
-      const csv = "\uFEFF" + [cabecera, ...cuerpo, pieTotales].join("\r\n");
+      const csv = "\uFEFF" + [cabecera, ...cuerpo, pie].join("\r\n");
 
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
@@ -614,13 +559,13 @@ export default function PedidosPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success(`Pedido descargado — ${filas.length} productos`);
+      toast.success(`Descargado — ${filas.length} productos`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al generar el archivo");
+      toast.error(err instanceof Error ? err.message : "Error al descargar");
     } finally {
       setGenerandoExcel(false);
     }
-  }, []);
+  }, [orders]);
 
   const handleStockChoice = useCallback((modo: "esperar" | "disponible") => {
     setStockOptionsOpen(false);
