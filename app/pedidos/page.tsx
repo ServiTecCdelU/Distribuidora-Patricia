@@ -1061,7 +1061,10 @@ export default function PedidosPage() {
         orders={filteredOrders}
       />
 
-      {/* Dialog: Esperar todo / Vender con lo que hay */}
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialog: Esperar todo / Vender con lo que hay — fuera de TabsContent para siempre estar montado */}
       <Dialog open={stockOptionsOpen} onOpenChange={(v) => {
         if (!v) { setStockOptionsOpen(false); setSelectedOrder(null); }
       }}>
@@ -1108,9 +1111,6 @@ export default function PedidosPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-        </TabsContent>
-      </Tabs>
     </MainLayout>
   );
 }

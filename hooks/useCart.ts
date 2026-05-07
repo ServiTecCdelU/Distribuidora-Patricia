@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { clientsApi, sellersApi, ordersApi } from "@/lib/api";
 import { getMayoristaProductos } from "@/services/mayorista-service";
 import { processSaleMayorista } from "@/services/sales-service";
+import { crearPedidoMayorista } from "@/services/pedidos-mayorista-service";
 import type { Product, Client, CartItem, Seller, City } from "@/lib/types";
 import { toast } from "sonner";
 import { formatCurrency, normalizeCuit } from "@/lib/utils/format";
@@ -787,7 +788,27 @@ export function useCart(role: UserRole, userEmail?: string) {
             discount: discountValue > 0 ? discountValue : undefined,
             discountType: discountValue > 0 ? discountType : undefined,
           });
-          toast.success("Pedido creado — falta stock del mayorista");
+
+          // Crear pedido al mayorista automáticamente con los items en déficit
+          const itemsDeficit = cart
+            .filter(item => item.quantity > (item.product.stockLocal ?? 0))
+            .map(item => {
+              const stockLocal = item.product.stockLocal ?? 0;
+              const faltante = item.quantity - stockLocal;
+              const unidadesPorBulto = (item.product as any).unidadesPorBulto ?? 1;
+              return {
+                productoId: item.product.id,
+                nombre: item.product.name,
+                unidadesPedidas: faltante,
+                unidadesRecibidas: 0,
+                bultosPedidos: Math.ceil(faltante / unidadesPorBulto),
+              };
+            });
+          if (itemsDeficit.length > 0) {
+            await crearPedidoMayorista(itemsDeficit);
+          }
+
+          toast.success("Pedido creado — pedido al mayorista generado automáticamente");
           resetCart();
           return "order";
         }
