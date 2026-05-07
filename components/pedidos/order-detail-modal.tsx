@@ -267,16 +267,18 @@ export function OrderDetailModal({
             <table className="w-full text-sm">
               <tbody>
                 <tr className="border-b border-gray-100">
-                  <td className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase w-1/4 whitespace-nowrap">
+                  <td className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase whitespace-nowrap w-[30%]">
                     <span className="flex items-center gap-1"><User className="h-3 w-3" /> Cliente</span>
                   </td>
-                  <td className="px-3 py-2 font-medium text-gray-900 truncate max-w-0 w-1/4">
+                  <td className="px-3 py-2 font-medium text-gray-900 text-sm truncate max-w-0">
                     {order.clientName || <span className="text-gray-400 italic text-xs">Venta directa</span>}
                   </td>
-                  <td className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase w-1/4 whitespace-nowrap border-l border-gray-100">
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase whitespace-nowrap">
                     Vendedor
                   </td>
-                  <td className="px-3 py-2 font-medium text-gray-900 truncate max-w-0 w-1/4">
+                  <td className="px-3 py-2 font-medium text-gray-900 text-sm truncate max-w-0">
                     {order.sellerName || <span className="text-gray-400 italic text-xs">Sin asignar</span>}
                   </td>
                 </tr>
@@ -284,7 +286,7 @@ export function OrderDetailModal({
                   <td className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase whitespace-nowrap">
                     <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> Dirección</span>
                   </td>
-                  <td className="px-3 py-2 text-gray-900 break-words" colSpan={3}>
+                  <td className="px-3 py-2 text-gray-900 text-sm break-words">
                     {order.address || <span className="text-gray-400 italic text-xs">Sin dirección</span>}
                     {order.city && <span className="text-gray-500 ml-1 text-xs">— {order.city}</span>}
                   </td>
@@ -293,7 +295,7 @@ export function OrderDetailModal({
                   <td className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase whitespace-nowrap">
                     <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Fecha</span>
                   </td>
-                  <td className="px-3 py-2 text-gray-900" colSpan={3}>
+                  <td className="px-3 py-2 text-gray-900 text-sm">
                     {formatDateFull(order.createdAt)}
                   </td>
                 </tr>
@@ -307,8 +309,8 @@ export function OrderDetailModal({
               <Box className="h-3.5 w-3.5" />
               Productos ({order.items.length})
             </Label>
-            <div className="rounded-xl border border-gray-100 overflow-hidden">
-              <table className="w-full text-xs">
+            <div className="rounded-xl border border-gray-100 overflow-x-auto">
+              <table className="w-full min-w-[380px] text-xs">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase">
                     <th className="px-3 py-2 text-left">Producto</th>
@@ -401,34 +403,34 @@ export function OrderDetailModal({
 
           {/* Progreso */}
           <div>
-            <Label className="text-xs text-gray-500 uppercase mb-4 block">Progreso del pedido</Label>
-            <div className="space-y-0">
+            <Label className="text-xs text-gray-500 uppercase mb-3 block">Progreso del pedido</Label>
+            <div className="flex items-start">
               {statusFlow.map((status, index) => {
-                const isCompleted = statusFlow.indexOf(order.status) >= index;
+                const currentIdx = statusFlow.indexOf(order.status);
+                const isCompleted = currentIdx >= index;
                 const isCurrent = order.status === status;
                 const stepConfig = statusConfig[status];
                 return (
-                  <div key={status} className="flex items-start gap-4 relative">
-                    {index < statusFlow.length - 1 && (
-                      <div className={`absolute left-4 top-8 w-0.5 h-8 ${isCompleted ? "bg-green-500" : "bg-gray-200"}`} />
+                  <React.Fragment key={status}>
+                    {index > 0 && (
+                      <div className={`flex-1 h-0.5 mt-3 ${currentIdx >= index ? "bg-green-500" : "bg-gray-200"}`} />
                     )}
-                    <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 flex-shrink-0 ${
-                      isCompleted ? `${stepConfig.dotColor} border-transparent`
-                        : isCurrent ? `bg-white ${stepConfig.color.replace("text-", "border-")}`
-                        : "bg-white border-gray-300"
-                    }`}>
-                      {isCompleted
-                        ? <CheckCircle className="h-4 w-4 text-white" />
-                        : <div className={`w-2 h-2 rounded-full ${isCurrent ? stepConfig.dotColor : "bg-gray-300"}`} />
-                      }
-                    </div>
-                    <div className="flex-1 pb-6">
-                      <p className={`text-sm font-semibold ${isCompleted || isCurrent ? "text-gray-900" : "text-gray-400"}`}>
+                    <div className="flex flex-col items-center gap-1 shrink-0 w-14">
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                        isCompleted ? `${stepConfig.dotColor} border-transparent` : "bg-white border-gray-300"
+                      }`}>
+                        {isCompleted
+                          ? <CheckCircle className="h-3.5 w-3.5 text-white" />
+                          : <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                        }
+                      </div>
+                      <p className={`text-[10px] text-center leading-tight ${
+                        isCurrent ? "font-semibold text-gray-900" : isCompleted ? "text-gray-500" : "text-gray-400"
+                      }`}>
                         {stepConfig.label}
                       </p>
-                      {isCurrent && <p className="text-xs text-gray-500 mt-0.5">Estado actual</p>}
                     </div>
-                  </div>
+                  </React.Fragment>
                 );
               })}
             </div>
