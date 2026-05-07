@@ -125,7 +125,7 @@ export function ProductModal({
   useEffect(() => {
     if (product) {
       setFormData({
-        name: product.name,
+        name: product.name || "",
         description: product.description || "",
         price: product.price,
         stock: product.stock,
