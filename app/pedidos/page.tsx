@@ -9,11 +9,10 @@ import { DataTableSkeleton } from "@/components/ui/data-table-skeleton";
 import { Input } from "@/components/ui/input";
 import { ClientModal } from "@/components/clientes/client-modal";
 import { ordersApi, salesApi, clientsApi, paymentsApi, sellersApi } from "@/lib/api";
-import type { Order, OrderStatus, Client, Seller } from "@/lib/types";
-import { Package, Search, Calendar, User, Filter, X, Loader2, Navigation, ClipboardList, Store, ShoppingCart, Warehouse, Clock, CheckCircle2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { VentasMayoristaTab } from "@/components/pedidos/VentasMayoristaTab";
-import { PedidoMayoristaTab } from "@/components/pedidos/PedidoMayoristaTab";
+import type { Order, OrderStatus, Client, Seller, MayoristaProducto } from "@/lib/types";
+import { Package, Search, User, Filter, X, Loader2, Navigation, ClipboardList, ShoppingCart, Warehouse, Clock, CheckCircle2, FileSpreadsheet } from "lucide-react";
+import { getSalesPendientesMayorista } from "@/services/sales-service";
+import { getMayoristaProductos } from "@/services/mayorista-service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -92,8 +91,8 @@ export default function PedidosPage() {
   const [processingPayment, setProcessingPayment] = useState(false);
 
   const [routeModalOpen, setRouteModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("entregas");
   const [stockOptionsOpen, setStockOptionsOpen] = useState(false);
+  const [generandoExcel, setGenerandoExcel] = useState(false);
 
   // Selección masiva
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
@@ -518,6 +517,99 @@ export default function PedidosPage() {
     setSelectedOrder(null);
   }, []);
 
+  const handleDescargarExcel = useCallback(async () => {
+    setGenerandoExcel(true);
+    try {
+      const [ventas, productos, ordenes] = await Promise.all([
+        getSalesPendientesMayorista(),
+        getMayoristaProductos(),
+        ordersApi.getAll(),
+      ]);
+
+      // Construir mapa de productos mayoristas
+      const productosMap = new Map<string, MayoristaProducto>();
+      productos.forEach((p) => {
+        productosMap.set(p.id, p);
+        if (p.productoId) productosMap.set(p.productoId, p);
+      });
+
+      // Acumular déficit
+      const acum = new Map<string, number>();
+
+      // Fuente 1: ventas con cantidadPendienteMayorista
+      for (const venta of ventas) {
+        for (const item of (venta.items ?? []) as any[]) {
+          const pendiente = item.cantidadPendienteMayorista ?? 0;
+          if (pendiente <= 0) continue;
+          acum.set(item.productId, (acum.get(item.productId) ?? 0) + pendiente);
+        }
+      }
+
+      // Fuente 2: órdenes activas con déficit de stockLocal
+      const ordenesActivas = ordenes.filter((o) => o.status !== "completed");
+      const totalPorProducto = new Map<string, number>();
+      for (const orden of ordenesActivas) {
+        for (const item of orden.items) {
+          const prod = productosMap.get(item.productId);
+          if (!prod) continue;
+          totalPorProducto.set(item.productId, (totalPorProducto.get(item.productId) ?? 0) + item.quantity);
+        }
+      }
+      for (const [productId, totalNecesario] of totalPorProducto) {
+        const prod = productosMap.get(productId);
+        const stockLocal = prod?.stockLocal ?? 0;
+        const deficit = Math.max(0, totalNecesario - stockLocal);
+        if (deficit <= 0) continue;
+        acum.set(productId, (acum.get(productId) ?? 0) + deficit);
+      }
+
+      if (acum.size === 0) {
+        toast.error("No hay productos pendientes para descargar");
+        return;
+      }
+
+      // Armar filas
+      const filas = Array.from(acum.entries()).map(([productoId, unidadesPedidas]) => {
+        const prod = productosMap.get(productoId);
+        const unidadesPorBulto = prod?.unidadesPorBulto ?? 1;
+        const lotes = Math.ceil(unidadesPedidas / unidadesPorBulto);
+        const precioUnit = prod?.precioUnitarioMayorista ?? 0;
+        return {
+          Producto: prod?.nombre ?? productoId,
+          "Uds. pedidas": unidadesPedidas,
+          "Lotes a pedir": lotes,
+          "Uds. por lote": unidadesPorBulto,
+          "Precio unit. mayorista ($)": precioUnit,
+          "Total estimado ($)": lotes * unidadesPorBulto * precioUnit,
+        };
+      }).sort((a, b) => a.Producto.localeCompare(b.Producto, "es"));
+
+      // Fila totales
+      filas.push({
+        Producto: "TOTAL",
+        "Uds. pedidas": filas.reduce((s, r) => s + r["Uds. pedidas"], 0),
+        "Lotes a pedir": filas.reduce((s, r) => s + r["Lotes a pedir"], 0),
+        "Uds. por lote": 0,
+        "Precio unit. mayorista ($)": 0,
+        "Total estimado ($)": filas.reduce((s, r) => s + r["Total estimado ($)"], 0),
+      });
+
+      const XLSX = await import("xlsx");
+      const ws = XLSX.utils.json_to_sheet(filas);
+      // Ancho de columnas
+      ws["!cols"] = [{ wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 18 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Pedido Mayorista");
+      const fecha = new Date().toLocaleDateString("es-AR").replace(/\//g, "-");
+      XLSX.writeFile(wb, `pedido-mayorista-${fecha}.xlsx`);
+      toast.success("Excel descargado");
+    } catch {
+      toast.error("Error al generar el Excel");
+    } finally {
+      setGenerandoExcel(false);
+    }
+  }, []);
+
   const handleStockChoice = useCallback((modo: "esperar" | "disponible") => {
     setStockOptionsOpen(false);
     if (modo === "disponible") {
@@ -770,21 +862,7 @@ export default function PedidosPage() {
 
   return (
     <MainLayout title="Pedidos" description="Seguimiento de pedidos y entregas">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="rounded-xl">
-          <TabsTrigger value="entregas" className="rounded-lg gap-1.5">
-            <ClipboardList className="h-4 w-4" /> Entregas
-          </TabsTrigger>
-          <TabsTrigger value="mayorista" className="rounded-lg gap-1.5">
-            <Store className="h-4 w-4" /> Pedido al mayorista
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="mayorista" className="mt-0">
-          <PedidoMayoristaTab />
-        </TabsContent>
-
-        <TabsContent value="entregas" className="mt-0">
+      <div className="space-y-4">
       <div className="mb-6 space-y-4">
         <div className="flex flex-col lg:flex-row gap-3 justify-between items-start lg:items-center">
           <div className="flex items-center gap-2 w-full lg:w-auto">
@@ -840,6 +918,17 @@ export default function PedidosPage() {
               <ClipboardList className="h-4 w-4" />
               <span className="hidden sm:inline">Listado de Carga</span>
               <span className="sm:hidden">Carga</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDescargarExcel}
+              disabled={generandoExcel}
+              className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+            >
+              {generandoExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+              <span className="hidden sm:inline">Descargar Pedido</span>
+              <span className="sm:hidden">Excel</span>
             </Button>
           </div>
         </div>
@@ -1013,7 +1102,7 @@ export default function PedidosPage() {
         onRemoveTransportista={handleRemoveTransportista}
         sellers={sellers}
         userRole={user?.role}
-        onHacerPedido={() => { closeAllModals(); setActiveTab("mayorista"); }}
+        onHacerPedido={undefined}
       />
 
       <PaymentModal
@@ -1061,10 +1150,9 @@ export default function PedidosPage() {
         orders={filteredOrders}
       />
 
-        </TabsContent>
-      </Tabs>
+      </div>
 
-      {/* Dialog: Esperar todo / Vender con lo que hay — fuera de TabsContent para siempre estar montado */}
+      {/* Dialog: Esperar todo / Vender con lo que hay */}
       <Dialog open={stockOptionsOpen} onOpenChange={(v) => {
         if (!v) { setStockOptionsOpen(false); setSelectedOrder(null); }
       }}>
