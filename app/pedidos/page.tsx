@@ -13,7 +13,6 @@ import type { Order, OrderStatus, Client, Seller, MayoristaProducto } from "@/li
 import { Package, Search, User, Filter, X, Loader2, Navigation, ClipboardList, ShoppingCart, Warehouse, Clock, CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { getSalesPendientesMayorista } from "@/services/sales-service";
 import { getMayoristaProductos } from "@/services/mayorista-service";
-import * as XLSX from "xlsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -564,55 +563,60 @@ export default function PedidosPage() {
         acum.set(productId, (acum.get(productId) ?? 0) + deficit);
       }
 
-      if (acum.size === 0) {
-        toast.error("No hay productos pendientes para descargar");
-        return;
-      }
-
-      // Armar filas
+      // Armar filas ordenadas
       const filas = Array.from(acum.entries()).map(([productoId, unidadesPedidas]) => {
         const prod = productosMap.get(productoId);
         const unidadesPorBulto = prod?.unidadesPorBulto ?? 1;
         const lotes = Math.ceil(unidadesPedidas / unidadesPorBulto);
         const precioUnit = prod?.precioUnitarioMayorista ?? 0;
         return {
-          Producto: prod?.nombre ?? productoId,
-          "Uds. pedidas": unidadesPedidas,
-          "Lotes a pedir": lotes,
-          "Uds. por lote": unidadesPorBulto,
-          "Precio unit. mayorista ($)": precioUnit,
-          "Total estimado ($)": lotes * unidadesPorBulto * precioUnit,
+          nombre: prod?.nombre ?? productoId,
+          udsPedidas: unidadesPedidas,
+          lotes,
+          udsPorLote: unidadesPorBulto,
+          precioUnit,
+          total: lotes * unidadesPorBulto * precioUnit,
         };
-      }).sort((a, b) => a.Producto.localeCompare(b.Producto, "es"));
+      }).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
-      // Fila totales
-      filas.push({
-        Producto: "TOTAL",
-        "Uds. pedidas": filas.reduce((s, r) => s + r["Uds. pedidas"], 0),
-        "Lotes a pedir": filas.reduce((s, r) => s + r["Lotes a pedir"], 0),
-        "Uds. por lote": 0,
-        "Precio unit. mayorista ($)": 0,
-        "Total estimado ($)": filas.reduce((s, r) => s + r["Total estimado ($)"], 0),
-      });
+      if (filas.length === 0) {
+        toast.info("No hay productos pendientes de mayorista");
+        return;
+      }
 
-      const ws = XLSX.utils.json_to_sheet(filas);
-      ws["!cols"] = [{ wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 18 }];
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Pedido Mayorista");
-      const fecha = new Date().toLocaleDateString("es-AR").replace(/\//g, "-");
-      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      const blob = new Blob([wbout], { type: "application/octet-stream" });
+      // Totales
+      const totalLotes = filas.reduce((s, r) => s + r.lotes, 0);
+      const totalEstimado = filas.reduce((s, r) => s + r.total, 0);
+
+      // Generar CSV con BOM para que Excel lo abra bien
+      const sep = ";";
+      const esc = (v: string | number) =>
+        typeof v === "string" ? `"${v.replace(/"/g, '""')}"` : String(v);
+
+      const cabecera = ["Producto", "Uds. pedidas", "Lotes a pedir", "Uds. por lote", "Precio unit.", "Total estimado ($)"]
+        .map(esc).join(sep);
+
+      const cuerpo = filas.map(f =>
+        [f.nombre, f.udsPedidas, f.lotes, f.udsPorLote, f.precioUnit, f.total].map(esc).join(sep)
+      );
+
+      const pieTotales = ["TOTAL", "", totalLotes, "", "", totalEstimado].map(esc).join(sep);
+
+      const csv = "\uFEFF" + [cabecera, ...cuerpo, pieTotales].join("\r\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
+      const fecha = new Date().toLocaleDateString("es-AR").replace(/\//g, "-");
       a.href = url;
-      a.download = `pedido-mayorista-${fecha}.xlsx`;
+      a.download = `pedido-mayorista-${fecha}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success("Excel descargado");
-    } catch {
-      toast.error("Error al generar el Excel");
+      toast.success(`Pedido descargado — ${filas.length} productos`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al generar el archivo");
     } finally {
       setGenerandoExcel(false);
     }
