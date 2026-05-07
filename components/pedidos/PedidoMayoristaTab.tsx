@@ -60,7 +60,12 @@ export function PedidoMayoristaTab() {
       ]);
       setVentasPendientes(ventas);
       const map = new Map<string, MayoristaProducto>();
-      productos.forEach((p) => map.set(p.id, p));
+      productos.forEach((p) => {
+        map.set(p.id, p);
+        // Indexar también por productoId (producto regular) para poder buscar
+        // desde los items de órdenes que usan productId del catálogo regular
+        if (p.productoId) map.set(p.productoId, p);
+      });
       setProductosMap(map);
       setPedidos(pedidosData);
       setOrdenesActivas(ordenes.filter((o) => o.status !== "completed"));
@@ -86,16 +91,22 @@ export function PedidoMayoristaTab() {
       }
     }
 
-    // Fuente 2: órdenes activas de Entregas donde stockLocal < quantity
+    // Fuente 2: órdenes activas de Entregas — sumar todo lo pedido por producto
+    // y comparar contra stock una sola vez (varias órdenes compiten por el mismo stock)
+    const totalPorProducto = new Map<string, number>();
     for (const orden of ordenesActivas) {
       for (const item of orden.items) {
         const prod = productosMap.get(item.productId);
         if (!prod) continue; // no es producto mayorista
-        const stockLocal = prod.stockLocal ?? 0;
-        const deficit = Math.max(0, item.quantity - stockLocal);
-        if (deficit <= 0) continue;
-        acum.set(item.productId, (acum.get(item.productId) ?? 0) + deficit);
+        totalPorProducto.set(item.productId, (totalPorProducto.get(item.productId) ?? 0) + item.quantity);
       }
+    }
+    for (const [productId, totalNecesario] of totalPorProducto) {
+      const prod = productosMap.get(productId);
+      const stockLocal = prod?.stockLocal ?? 0;
+      const deficit = Math.max(0, totalNecesario - stockLocal);
+      if (deficit <= 0) continue;
+      acum.set(productId, (acum.get(productId) ?? 0) + deficit);
     }
 
     return Array.from(acum.entries()).map(([productoId, unidadesPedidas]) => {
