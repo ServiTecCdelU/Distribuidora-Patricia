@@ -2,10 +2,6 @@
 
 Este archivo guia a Claude Code cuando trabaja con este repositorio. **Siempre responder en español.**
 
-CONTEXTO DEL PROYECTO
-Este es un sistema de gestión (productos, pedidos, etc.) para Distribuidora Patricia, una distribuidora de alimentos.
-El sistema es interno (requiere login). No hay sección pública.
-
 NOMBRE DE LA DISTRIBUIDORA: Distribuidora Patricia
 ## Commands
 
@@ -61,10 +57,12 @@ Siempre hacer commit y push al terminar cada tarea, sin esperar confirmacion del
 - Ser conciso en las respuestas, sin introducciones ni cierres innecesarios.
 - No explicar lo que vas a hacer, hacerlo directamente.
 - Mantener soluciones simples y directas.
-- Si una tarea es ambigua, hacer una sola pregunta antes de empezar, no varias.
+- Ante ambigüedad menor, asumir e informar al final.
 - Las instrucciones del usuario siempre tienen prioridad sobre este archivo.
 - Razonar antes de actuar, pero ser breve en el output.
-- Testear el código antes de declarar una tarea como terminada.
+- Testear el código antes de declarar una tarea como terminada. No pedir confirmación para testear, ejecutar directamente.
+- NUNCA pedir confirmación al usuario. Ejecutar, commitear y pushear sin esperar respuesta.
+- Respuestas mínimas: sin introducción, sin cierre, sin explicar lo que se va a hacer.
 
 ## Decisiones de Arquitectura (no revertir)
 
