@@ -262,121 +262,140 @@ export function OrderDetailModal({
             </div>
           )}
 
-          {/* Info grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <Label className="text-xs text-gray-500 uppercase flex items-center gap-1.5 mb-2">
-                <User className="h-3.5 w-3.5" />
-                Cliente
-              </Label>
-              <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">
-                {order.clientName || <span className="text-gray-400 italic">Venta directa</span>}
-              </p>
-            </div>
-            <div className="p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <Label className="text-xs text-gray-500 uppercase mb-2 block">Vendedor</Label>
-              <p className="font-semibold text-gray-900 text-sm sm:text-base">{order.sellerName || "Sin asignar"}</p>
-            </div>
-          </div>
-
-          <div className="space-y-2 sm:space-y-3">
-            {order.city && (
-              <div className="p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <Label className="text-xs text-gray-500 uppercase flex items-center gap-1.5 mb-1.5 sm:mb-2">
-                  <Truck className="h-3.5 w-3.5" />
-                  Ciudad
-                </Label>
-                <p className="text-gray-900 font-medium text-sm sm:text-base">{order.city}</p>
-              </div>
-            )}
-            <div className="p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <Label className="text-xs text-gray-500 uppercase flex items-center gap-1.5 mb-1.5 sm:mb-2">
-                <MapPin className="h-3.5 w-3.5" />
-                Dirección
-              </Label>
-              <p className="text-gray-900 font-medium text-sm sm:text-base break-words">{order.address}</p>
-            </div>
-            <div className="p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <Label className="text-xs text-gray-500 uppercase flex items-center gap-1.5 mb-1.5 sm:mb-2">
-                <Calendar className="h-3.5 w-3.5" />
-                Fecha
-              </Label>
-              <p className="text-gray-900 font-medium text-sm sm:text-base">{formatDateFull(order.createdAt)}</p>
-            </div>
+          {/* Info table */}
+          <div className="rounded-xl border border-gray-100 overflow-hidden">
+            <table className="w-full text-sm">
+              <tbody>
+                <tr className="border-b border-gray-100">
+                  <td className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase w-1/4 whitespace-nowrap">
+                    <span className="flex items-center gap-1"><User className="h-3 w-3" /> Cliente</span>
+                  </td>
+                  <td className="px-3 py-2 font-medium text-gray-900 truncate max-w-0 w-1/4">
+                    {order.clientName || <span className="text-gray-400 italic text-xs">Venta directa</span>}
+                  </td>
+                  <td className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase w-1/4 whitespace-nowrap border-l border-gray-100">
+                    Vendedor
+                  </td>
+                  <td className="px-3 py-2 font-medium text-gray-900 truncate max-w-0 w-1/4">
+                    {order.sellerName || <span className="text-gray-400 italic text-xs">Sin asignar</span>}
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase whitespace-nowrap">
+                    <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> Dirección</span>
+                  </td>
+                  <td className="px-3 py-2 text-gray-900 break-words" colSpan={3}>
+                    {order.address || <span className="text-gray-400 italic text-xs">Sin dirección</span>}
+                    {order.city && <span className="text-gray-500 ml-1 text-xs">— {order.city}</span>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase whitespace-nowrap">
+                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Fecha</span>
+                  </td>
+                  <td className="px-3 py-2 text-gray-900" colSpan={3}>
+                    {formatDateFull(order.createdAt)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           {/* Productos */}
           <div>
-            <Label className="text-xs text-gray-500 uppercase flex items-center gap-1.5 mb-3">
+            <Label className="text-xs text-gray-500 uppercase flex items-center gap-1.5 mb-2">
               <Box className="h-3.5 w-3.5" />
               Productos ({order.items.length})
             </Label>
-            <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
-              {order.items.map((item, index) => {
-                const base = item.price * item.quantity;
-                const dto = item.itemDiscount ?? 0;
-                const precioConDto = item.price * (1 - dto / 100);
-                const subtotal = precioConDto * item.quantity;
-                return (
-                  <div key={index} className="flex justify-between items-center py-3 px-4 border-b last:border-0 hover:bg-gray-100/50 transition-colors gap-2">
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-gray-900 block truncate">{item.name}</span>
-                      <span className="text-xs text-gray-500">
-                        {dto > 0
-                          ? <><s>{formatPrice(item.price)}</s> → {formatPrice(precioConDto)} c/u <span className="text-emerald-600 font-medium">(-{dto}%)</span></>
-                          : <>{formatPrice(item.price)} c/u</>
-                        }
-                      </span>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <Badge variant="secondary" className="font-mono block mb-0.5">x{item.quantity}</Badge>
-                      <span className="text-xs font-semibold text-gray-900">{formatPrice(subtotal)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-              {/* Subtotales y descuentos */}
-              {(() => {
-                const subtotalBruto = order.items.reduce((acc, i) => acc + i.price * i.quantity, 0);
-                const subtotalConItemDtos = order.items.reduce((acc, i) => {
-                  const base = i.price * i.quantity;
-                  const dto = i.itemDiscount ? (base * i.itemDiscount) / 100 : 0;
-                  return acc + base - dto;
-                }, 0);
-                const hayItemDtos = subtotalBruto > subtotalConItemDtos;
-                const generalDiscount = (order as any).discount ?? 0;
-                const generalDiscountType = (order as any).discountType;
-                const generalDiscountAmt = generalDiscount > 0
-                  ? (generalDiscountType === "percent" ? (subtotalConItemDtos * generalDiscount) / 100 : generalDiscount)
-                  : 0;
-                const total = Math.max(0, subtotalConItemDtos - generalDiscountAmt);
-                return (
-                  <div className="py-2 px-4 bg-gray-100/50 border-t space-y-1">
-                    {(hayItemDtos || generalDiscountAmt > 0) && (
-                      <div className="flex justify-between items-center text-xs text-gray-500">
-                        <span>Subtotal</span>
-                        <span>{formatPrice(subtotalBruto)}</span>
-                      </div>
-                    )}
-                    {hayItemDtos && (
-                      <div className="flex justify-between items-center text-xs text-emerald-600">
-                        <span>Dto. por producto</span>
-                        <span>-{formatPrice(subtotalBruto - subtotalConItemDtos)}</span>
-                      </div>
-                    )}
-                    {generalDiscountAmt > 0 && (
-                      <div className="flex justify-between items-center text-xs text-emerald-600">
-                        <span>Dto. general {generalDiscountType === "percent" ? `(${generalDiscount}%)` : ""}</span>
-                        <span>-{formatPrice(generalDiscountAmt)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center pt-1 border-t border-gray-200">
-                      <span className="text-sm font-semibold text-gray-700">Total</span>
-                      <span className="font-bold text-gray-900">{formatPrice(total)}</span>
-                    </div>
-                  </div>
-                );
-              })()}
+            <div className="rounded-xl border border-gray-100 overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase">
+                    <th className="px-3 py-2 text-left">Producto</th>
+                    <th className="px-2 py-2 text-right w-10">Cant.</th>
+                    <th className="px-2 py-2 text-right w-24">P. unit</th>
+                    <th className="px-2 py-2 text-right w-12">Dto.</th>
+                    <th className="px-3 py-2 text-right w-24">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {order.items.map((item, index) => {
+                    const dto = item.itemDiscount ?? 0;
+                    const precioConDto = item.price * (1 - dto / 100);
+                    const subtotal = precioConDto * item.quantity;
+                    return (
+                      <tr key={index} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
+                        <td className="px-3 py-2.5 font-medium text-gray-900 truncate max-w-0">
+                          {item.name}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-gray-700 font-mono">
+                          {item.quantity}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-gray-700">
+                          {dto > 0
+                            ? <span className="flex flex-col items-end"><s className="text-gray-400">{formatPrice(item.price)}</s><span>{formatPrice(precioConDto)}</span></span>
+                            : formatPrice(item.price)
+                          }
+                        </td>
+                        <td className="px-2 py-2.5 text-right">
+                          {dto > 0
+                            ? <span className="text-emerald-600 font-semibold">{dto}%</span>
+                            : <span className="text-gray-300">—</span>
+                          }
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-gray-900">
+                          {formatPrice(subtotal)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  {(() => {
+                    const subtotalBruto = order.items.reduce((acc, i) => acc + i.price * i.quantity, 0);
+                    const subtotalConItemDtos = order.items.reduce((acc, i) => {
+                      const base = i.price * i.quantity;
+                      const dto = i.itemDiscount ? (base * i.itemDiscount) / 100 : 0;
+                      return acc + base - dto;
+                    }, 0);
+                    const hayItemDtos = subtotalBruto > subtotalConItemDtos;
+                    const generalDiscount = (order as any).discount ?? 0;
+                    const generalDiscountType = (order as any).discountType;
+                    const generalDiscountAmt = generalDiscount > 0
+                      ? (generalDiscountType === "percent" ? (subtotalConItemDtos * generalDiscount) / 100 : generalDiscount)
+                      : 0;
+                    const total = Math.max(0, subtotalConItemDtos - generalDiscountAmt);
+                    return (
+                      <>
+                        {(hayItemDtos || generalDiscountAmt > 0) && (
+                          <tr className="border-t border-gray-100 bg-gray-50/50">
+                            <td colSpan={4} className="px-3 py-1.5 text-xs text-gray-500">Subtotal</td>
+                            <td className="px-3 py-1.5 text-right text-xs text-gray-500">{formatPrice(subtotalBruto)}</td>
+                          </tr>
+                        )}
+                        {hayItemDtos && (
+                          <tr className="bg-gray-50/50">
+                            <td colSpan={4} className="px-3 py-1 text-xs text-emerald-600">Dto. por producto</td>
+                            <td className="px-3 py-1 text-right text-xs text-emerald-600">-{formatPrice(subtotalBruto - subtotalConItemDtos)}</td>
+                          </tr>
+                        )}
+                        {generalDiscountAmt > 0 && (
+                          <tr className="bg-gray-50/50">
+                            <td colSpan={4} className="px-3 py-1 text-xs text-emerald-600">
+                              Dto. general {generalDiscountType === "percent" ? `(${generalDiscount}%)` : ""}
+                            </td>
+                            <td className="px-3 py-1 text-right text-xs text-emerald-600">-{formatPrice(generalDiscountAmt)}</td>
+                          </tr>
+                        )}
+                        <tr className="border-t border-gray-200 bg-gray-50">
+                          <td colSpan={4} className="px-3 py-2.5 text-sm font-semibold text-gray-700">Total</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-gray-900">{formatPrice(total)}</td>
+                        </tr>
+                      </>
+                    );
+                  })()}
+                </tfoot>
+              </table>
             </div>
           </div>
 
