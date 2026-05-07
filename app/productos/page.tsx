@@ -1517,7 +1517,12 @@ export default function ProductosPage() {
                                 {product.category}
                               </td>
                               <td className="px-3 py-2.5 text-right font-semibold text-teal-600 whitespace-nowrap">
-                                {formatCurrency(product.price)}
+                                {product.unidadesPorBulto && product.seDivideEn && product.seDivideEn > 1
+                                  ? formatCurrency(Math.round(product.price * product.unidadesPorBulto / product.seDivideEn * 100) / 100)
+                                  : formatCurrency(product.price)}
+                                {product.unidadesPorBulto && product.seDivideEn && product.seDivideEn > 1 && (
+                                  <span className="block text-[10px] font-normal text-muted-foreground">/ lote</span>
+                                )}
                               </td>
                               <td className="px-3 py-2.5 text-right">
                                 <Badge
