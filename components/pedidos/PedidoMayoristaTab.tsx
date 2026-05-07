@@ -22,9 +22,12 @@ import { cn } from "@/lib/utils";
 interface ItemConsolidado {
   productoId: string;
   nombre: string;
-  unidadesPedidas: number;
-  unidadesPorBulto: number;
-  bultosPedidos: number;
+  unidadesPedidas: number;   // unidades que piden los clientes
+  unidadesPorBulto: number;  // tamaño del lote (lo que viene del mayorista)
+  seDivideEn: number;        // en cuántas porciones se divide el lote
+  unidadesPorPorcion: number; // unidadesPorBulto / seDivideEn
+  lotesAPedir: number;       // lotes enteros a comprar = ceil(pedidas / unidadesPorBulto)
+  sobrante: number;          // unidades que van a sobrar = lotesAPedir*unidadesPorBulto - pedidas
   precioMayorista: number;
 }
 
@@ -72,12 +75,19 @@ export function PedidoMayoristaTab() {
     return Array.from(acum.entries()).map(([productoId, unidadesPedidas]) => {
       const prod = productosMap.get(productoId);
       const unidadesPorBulto = prod?.unidadesPorBulto ?? 1;
+      const seDivideEn = prod?.seDivideEn ?? 1;
+      const unidadesPorPorcion = seDivideEn > 0 ? Math.round(unidadesPorBulto / seDivideEn) : unidadesPorBulto;
+      const lotesAPedir = Math.ceil(unidadesPedidas / unidadesPorBulto);
+      const sobrante = lotesAPedir * unidadesPorBulto - unidadesPedidas;
       return {
         productoId,
         nombre: prod?.nombre ?? productoId,
         unidadesPedidas,
         unidadesPorBulto,
-        bultosPedidos: Math.ceil(unidadesPedidas / unidadesPorBulto),
+        seDivideEn,
+        unidadesPorPorcion,
+        lotesAPedir,
+        sobrante,
         precioMayorista: prod?.precioUnitarioMayorista ?? 0,
       };
     }).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
@@ -106,7 +116,7 @@ export function PedidoMayoristaTab() {
           nombre: i.nombre,
           unidadesPedidas: i.unidadesPedidas,
           unidadesRecibidas: 0,
-          bultosPedidos: i.bultosPedidos,
+          bultosPedidos: i.lotesAPedir,
         }))
       );
       setPedidos((prev) => [nuevo, ...prev]);
@@ -133,9 +143,13 @@ export function PedidoMayoristaTab() {
 
   const buildTextoWhatsapp = (pedido: PedidoMayorista): string => {
     const fecha = pedido.fecha.toLocaleDateString("es-AR");
-    const lineas = pedido.productos.map(
-      (p) => `• ${p.nombre}: ${p.bultosPedidos} bulto${p.bultosPedidos !== 1 ? "s" : ""} (${p.unidadesPedidas} uds)`
-    );
+    const lineas = pedido.productos.map((p) => {
+      const consolidated = itemsConsolidados.find(i => i.productoId === p.productoId);
+      const loteInfo = consolidated && consolidated.seDivideEn > 1
+        ? ` [lote ${consolidated.unidadesPorBulto}u ÷${consolidated.seDivideEn}]`
+        : consolidated ? ` [lote ${consolidated.unidadesPorBulto}u]` : "";
+      return `• ${p.nombre}: *${p.bultosPedidos} lote${p.bultosPedidos !== 1 ? "s" : ""}*${loteInfo} (${p.unidadesPedidas} uds pedidas)`;
+    });
     return [
       `*Pedido al mayorista — ${fecha}*`,
       "",
@@ -164,25 +178,33 @@ export function PedidoMayoristaTab() {
 
       // Tabla
       let y = 46;
-      pdf.setFontSize(10);
+      pdf.setFontSize(9);
       pdf.setFont("helvetica", "bold");
       pdf.text("Producto", 14, y);
-      pdf.text("Uds pedidas", 120, y);
-      pdf.text("Bultos", 155, y);
+      pdf.text("Pedidas", 100, y);
+      pdf.text("Lote", 120, y);
+      pdf.text("Lotes a pedir", 140, y);
+      pdf.text("Sobrante", 172, y);
       y += 2;
       pdf.line(14, y, 196, y);
       y += 6;
 
       pdf.setFont("helvetica", "normal");
       for (const item of pedido.productos) {
-        if (y > 270) {
-          pdf.addPage();
-          y = 20;
-        }
-        const nombre = item.nombre.length > 55 ? item.nombre.substring(0, 52) + "..." : item.nombre;
+        if (y > 270) { pdf.addPage(); y = 20; }
+        const consolidated = itemsConsolidados.find(i => i.productoId === item.productoId);
+        const nombre = item.nombre.length > 45 ? item.nombre.substring(0, 42) + "..." : item.nombre;
+        const loteStr = consolidated
+          ? `${consolidated.unidadesPorBulto}u${consolidated.seDivideEn > 1 ? `÷${consolidated.seDivideEn}` : ""}`
+          : "—";
+        const sobranteStr = consolidated && consolidated.sobrante > 0 ? `${consolidated.sobrante} u` : "—";
         pdf.text(nombre, 14, y);
-        pdf.text(String(item.unidadesPedidas), 128, y);
-        pdf.text(String(item.bultosPedidos), 163, y);
+        pdf.text(String(item.unidadesPedidas) + " u", 100, y);
+        pdf.text(loteStr, 120, y);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(String(item.bultosPedidos), 155, y);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(sobranteStr, 172, y);
         y += 7;
       }
 
@@ -235,18 +257,41 @@ export function PedidoMayoristaTab() {
                 <thead className="bg-muted/50 border-b">
                   <tr>
                     <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Producto</th>
-                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Uds</th>
-                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Bultos</th>
-                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground hidden sm:table-cell">Precio mayorista</th>
+                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Pedidas</th>
+                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground hidden sm:table-cell">Lote</th>
+                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Lotes a pedir</th>
+                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground hidden md:table-cell">Sobrante</th>
+                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground hidden lg:table-cell">$ May.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {itemsConsolidados.map((item) => (
                     <tr key={item.productoId} className="hover:bg-muted/20">
-                      <td className="px-3 py-2 font-medium max-w-[180px] truncate">{item.nombre}</td>
-                      <td className="px-3 py-2 text-right">{item.unidadesPedidas}</td>
-                      <td className="px-3 py-2 text-right font-semibold">{item.bultosPedidos}</td>
-                      <td className="px-3 py-2 text-right text-muted-foreground hidden sm:table-cell">
+                      <td className="px-3 py-2 font-medium max-w-[160px]">
+                        <p className="truncate">{item.nombre}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {item.seDivideEn > 1
+                            ? `${item.unidadesPorPorcion} u/porción · ${item.seDivideEn} porciones`
+                            : `${item.unidadesPorBulto} u/lote`}
+                        </p>
+                      </td>
+                      <td className="px-3 py-2 text-right align-top">{item.unidadesPedidas} u</td>
+                      <td className="px-3 py-2 text-right align-top hidden sm:table-cell text-muted-foreground">
+                        {item.unidadesPorBulto} u
+                        {item.seDivideEn > 1 && <span className="text-[10px] block">÷{item.seDivideEn}</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right align-top font-bold text-primary">
+                        {item.lotesAPedir}
+                        <span className="font-normal text-muted-foreground"> lote{item.lotesAPedir !== 1 ? "s" : ""}</span>
+                      </td>
+                      <td className="px-3 py-2 text-right align-top hidden md:table-cell">
+                        {item.sobrante > 0 ? (
+                          <span className="text-amber-600 font-medium">{item.sobrante} u</span>
+                        ) : (
+                          <span className="text-emerald-600">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right align-top text-muted-foreground hidden lg:table-cell">
                         {item.precioMayorista > 0 ? formatCurrency(item.precioMayorista) : "—"}
                       </td>
                     </tr>

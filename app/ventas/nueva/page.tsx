@@ -485,7 +485,20 @@ const ProductListItem = memo(function ProductListItem({
         <span className="block truncate">{product.name}</span>
       </td>
       <td className="py-1.5 px-2 text-xs text-muted-foreground text-right whitespace-nowrap">
-        {esMayorista ? `L: ${stockDisplay}` : `${stockDisplay} u`}
+        {esMayorista ? (
+          <span className="flex flex-col items-end gap-0.5">
+            <span>L: {stockDisplay}</span>
+            {(product.unidadesPorBulto ?? 0) > 0 && (
+              <span className="text-[10px] text-muted-foreground/70">
+                {product.seDivideEn && product.seDivideEn > 1
+                  ? `${product.unidadesPorBulto}u ÷${product.seDivideEn}`
+                  : `lote ${product.unidadesPorBulto}u`}
+              </span>
+            )}
+          </span>
+        ) : (
+          `${stockDisplay} u`
+        )}
       </td>
       <td className="py-1.5 px-2 text-xs font-semibold text-right whitespace-nowrap">{formatCurrency(product.price)}</td>
       <td className="py-1.5 pl-2 pr-3 text-center w-8">
