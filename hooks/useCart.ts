@@ -178,7 +178,7 @@ export function useCart(role: UserRole, userEmail?: string) {
   });
 
   // Client - lookup
-  const [lookupType, setLookupType] = useState<LookupType>("dni");
+  const [lookupType, setLookupType] = useState<LookupType>("search");
   const [dniLookup, setDniLookup] = useState("");
   const [dniLoading, setDniLoading] = useState(false);
   const [dniFound, setDniFound] = useState(false);
@@ -335,6 +335,7 @@ export function useCart(role: UserRole, userEmail?: string) {
 
   // --- Client lookup (DNI or CUIT) ---
   useEffect(() => {
+    if (lookupType === "search") return;
     const minLength = lookupType === "dni" ? 7 : 5;
     if (!dniLookup || dniLookup.trim().length < minLength) {
       setDniFound(false);
@@ -915,7 +916,6 @@ export function useCart(role: UserRole, userEmail?: string) {
       setDniClientId(found.id);
       setDniFound(true);
       setDniNotFound(false);
-      setDniLookup(found.dni || found.cuit || "");
     },
     [clients],
   );

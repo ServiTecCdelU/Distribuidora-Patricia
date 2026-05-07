@@ -947,26 +947,7 @@ function ClientLookupSection({
         </Button>
       </div>
 
-      {/* Toggle DNI / CUIT / Buscar */}
-      <div className="flex gap-1">
-        <Button type="button" size="sm"
-          variant={lookupType === "dni" ? "default" : "outline"}
-          className="h-7 text-[11px] px-2 flex-1"
-          onClick={() => handleToggle("dni")}
-        >DNI</Button>
-        <Button type="button" size="sm"
-          variant={lookupType === "cuit" ? "default" : "outline"}
-          className="h-7 text-[11px] px-2 flex-1"
-          onClick={() => handleToggle("cuit")}
-        >CUIT</Button>
-        <Button type="button" size="sm"
-          variant={lookupType === "search" ? "default" : "outline"}
-          className="h-7 text-[11px] px-2 flex-1"
-          onClick={() => handleToggle("search")}
-        >Buscar</Button>
-      </div>
-
-      {/* Modo búsqueda libre */}
+      {/* Búsqueda libre */}
       {lookupType === "search" && (
         dniFound ? (
           <div className="flex items-center justify-between gap-2">
@@ -1017,35 +998,6 @@ function ClientLookupSection({
         )
       )}
 
-      {/* Modo DNI / CUIT */}
-      {lookupType !== "search" && (
-      <div className="space-y-2">
-        <Input
-          placeholder={lookupType === "dni" ? "Ej: 30123456" : "Ej: 20-30123456-9"}
-          value={dniLookup}
-          onChange={(e) => onLookupChange(e.target.value)}
-          className="h-9 text-sm"
-          disabled={dniFound}
-        />
-        {dniLoading && <p className="text-xs text-muted-foreground">Buscando cliente...</p>}
-        {dniFound && (
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-emerald-600 font-medium truncate">Cliente encontrado: {clientName}</p>
-            <div className="flex items-center gap-1 shrink-0">
-              <Button type="button" variant="ghost" size="sm"
-                className="h-5 text-[10px] text-primary px-1.5 hover:bg-primary/5"
-                onClick={onEditClient}>Editar</Button>
-              <Button type="button" variant="ghost" size="sm"
-                className="h-5 text-[10px] text-muted-foreground px-1.5 hover:text-destructive"
-                onClick={() => onLookupChange("")}>Cambiar</Button>
-            </div>
-          </div>
-        )}
-        {dniNotFound && !dniFound && (
-          <p className="text-xs text-amber-600 font-medium">Cliente no encontrado.</p>
-        )}
-      </div>
-      )}
 
       {/* Client info */}
       {dniFound ? (
