@@ -7,8 +7,6 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -31,8 +29,6 @@ import {
   X,
   Eye,
   EyeOff,
-  List,
-  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -89,7 +85,6 @@ function NuevaVentaContent({
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showDisabled, setShowDisabled] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [cartDialogOpen, setCartDialogOpen] = useState(false);
   const [mayoristaDialogOpen, setMayoristaDialogOpen] = useState(false);
 
@@ -240,14 +235,6 @@ function NuevaVentaContent({
                 <span className="text-xs font-medium text-muted-foreground">Deshabilitados</span>
                 <Switch checked={showDisabled} onCheckedChange={setShowDisabled} className="scale-75" />
               </div>
-              <div className="flex items-center gap-1 border border-border rounded-lg p-0.5">
-                <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setViewMode("grid")}>
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setViewMode("list")}>
-                  <List className="h-3.5 w-3.5" />
-                </Button>
-              </div>
             </div>
           }
         />
@@ -268,9 +255,9 @@ function NuevaVentaContent({
         </div>
 
         {state.loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className="space-y-1">
             {[...Array(10)].map((_, i) => (
-              <Skeleton key={i} className="h-52 rounded-xl" />
+              <Skeleton key={i} className="h-10 rounded-lg" />
             ))}
           </div>
         ) : !filteredProducts ? (
@@ -292,7 +279,7 @@ function NuevaVentaContent({
                   <span>Habilitados</span>
                   <div className="h-1 flex-1 bg-gradient-to-l from-primary/20 to-transparent rounded" />
                 </h3>
-                <ProductGrid products={enabledProducts} cart={state.cart} addToCart={actions.addToCart} formatCurrency={actions.formatCurrency} viewMode={viewMode} />
+                <ProductGrid products={enabledProducts} cart={state.cart} addToCart={actions.addToCart} formatCurrency={actions.formatCurrency} />
               </div>
             )}
             {showDisabled && disabledProducts.length > 0 && (
@@ -302,7 +289,7 @@ function NuevaVentaContent({
                   <span>Deshabilitados</span>
                   <div className="h-1 flex-1 bg-gradient-to-l from-muted-foreground/20 to-transparent rounded" />
                 </h3>
-                <ProductGrid products={disabledProducts} cart={state.cart} addToCart={actions.addToCart} formatCurrency={actions.formatCurrency} disabled viewMode={viewMode} />
+                <ProductGrid products={disabledProducts} cart={state.cart} addToCart={actions.addToCart} formatCurrency={actions.formatCurrency} disabled />
               </div>
             )}
           </div>
@@ -472,83 +459,6 @@ function MayoristaOptionsDialog({
 
 // ─── Sub-componentes de productos ─────────────────────────────────────────────
 
-const LOGO_FALLBACK = "/logo.png";
-
-function getImageSrc(imageUrl?: string): string {
-  if (!imageUrl) return LOGO_FALLBACK;
-  if (imageUrl.startsWith("http")) return imageUrl;
-  return LOGO_FALLBACK;
-}
-
-const ProductCard = memo(function ProductCard({
-  product, quantity, onAdd, formatCurrency, disabled,
-}: {
-  product: Product;
-  quantity: number;
-  onAdd: (p: Product) => void;
-  formatCurrency: (n: number) => string;
-  disabled?: boolean;
-}) {
-  const esMayorista = product.stockLocal !== undefined;
-  const stockDisplay = esMayorista ? (product.stockLocal ?? 0) : product.stock;
-  return (
-    <Card
-      className={cn(
-        "group cursor-pointer transition-all duration-200 hover:shadow-lg border-2 overflow-hidden",
-        disabled && "opacity-60 border-dashed",
-        quantity > 0 ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-transparent hover:border-border",
-      )}
-      onClick={() => onAdd(product)}
-    >
-      <CardContent className="p-0">
-        <div className="relative aspect-square overflow-hidden bg-muted">
-          <img
-            src={getImageSrc(product.imageUrl)}
-            alt={product.name}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full transition-transform duration-500 group-hover:scale-110 object-contain p-4 opacity-40"
-            onError={(e) => {
-              const img = e.target as HTMLImageElement;
-              if (img.src !== window.location.origin + LOGO_FALLBACK) {
-                img.src = LOGO_FALLBACK;
-              }
-            }}
-          />
-          {disabled && (
-            <div className="absolute top-2 left-2">
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-background/80 backdrop-blur">
-                <EyeOff className="h-2.5 w-2.5 mr-0.5" /> Oculto
-              </Badge>
-            </div>
-          )}
-          {quantity > 0 && (
-            <div className="absolute top-2 right-2 h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-background">
-              {quantity}
-            </div>
-          )}
-          {esMayorista && stockDisplay === 0 && (
-            <Badge variant="outline" className="absolute bottom-2 left-2 text-[10px] py-0 px-2 shadow-md border-amber-400 text-amber-700 bg-amber-50">
-              Sin stock local
-            </Badge>
-          )}
-        </div>
-        <div className="p-2">
-          <h3 className="font-medium text-xs text-foreground line-clamp-3 mb-1.5 min-h-[3rem] leading-tight">
-            {product.name}
-          </h3>
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-sm text-primary">{formatCurrency(product.price)}</span>
-            <span className={cn("text-[10px] font-medium", stockDisplay === 0 ? "text-amber-600" : "text-muted-foreground")}>
-              {esMayorista ? `local: ${stockDisplay}` : `${stockDisplay} uds`}
-            </span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-});
-
 const ProductListItem = memo(function ProductListItem({
   product, quantity, onAdd, formatCurrency, disabled,
 }: {
@@ -569,11 +479,6 @@ const ProductListItem = memo(function ProductListItem({
       )}
       onClick={() => onAdd(product)}
     >
-      <img
-        src="/logo.png"
-        alt={product.name}
-        className="w-10 h-10 rounded-md object-contain p-1 shrink-0 border border-border/30 opacity-40"
-      />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{product.name}</p>
         <p className="text-xs text-muted-foreground">
@@ -590,14 +495,13 @@ const ProductListItem = memo(function ProductListItem({
 });
 
 function ProductGrid({
-  products, cart, addToCart, formatCurrency, disabled = false, viewMode = "grid",
+  products, cart, addToCart, formatCurrency, disabled = false,
 }: {
   products: Product[];
   cart: CartItem[];
   addToCart: (p: Product) => void;
   formatCurrency: (n: number) => string;
   disabled?: boolean;
-  viewMode?: "grid" | "list";
 }) {
   const cartMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -605,27 +509,10 @@ function ProductGrid({
     return map;
   }, [cart]);
 
-  if (viewMode === "list") {
-    return (
-      <div className="space-y-1">
-        {products.map((product) => (
-          <ProductListItem
-            key={product.id}
-            product={product}
-            quantity={cartMap.get(product.id) || 0}
-            onAdd={addToCart}
-            formatCurrency={formatCurrency}
-            disabled={disabled}
-          />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-2">
+    <div className="space-y-1">
       {products.map((product) => (
-        <ProductCard
+        <ProductListItem
           key={product.id}
           product={product}
           quantity={cartMap.get(product.id) || 0}

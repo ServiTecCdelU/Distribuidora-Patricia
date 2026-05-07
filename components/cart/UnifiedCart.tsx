@@ -212,11 +212,6 @@ export function UnifiedCart({ role, state, actions, onConfirmSale, allowDiscount
               key={item.product.id}
               className="group relative flex items-start gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-card border border-border/50 hover:border-border transition-all"
             >
-              <img
-                src={item.product.imageUrl || "/placeholder.svg"}
-                alt={item.product.name}
-                className="w-12 h-12 sm:w-14 sm:h-14 rounded-md object-cover shrink-0 border border-border/30"
-              />
               <div className="flex-1 min-w-0 space-y-1.5">
                 <div className="flex items-start justify-between gap-1">
                   <div className="flex-1 min-w-0">
