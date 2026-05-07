@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { productsApi } from "@/lib/api";
 import type { Product, MayoristaProducto } from "@/lib/types";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatCurrency, formatCompactNumber } from "@/lib/utils/format";
 import {
   getMayoristaProductos,
@@ -47,6 +48,7 @@ import {
   TrendingUp,
   WheatOff,
   EyeOff,
+  Eye,
   FileUp,
   FileDown,
   Upload,
@@ -1529,12 +1531,44 @@ export default function ProductosPage() {
                                   {product.stock}
                                 </Badge>
                               </td>
-                              <td className="px-3 py-2.5 text-center text-xs text-muted-foreground whitespace-nowrap">
+                              <td className="px-3 py-2.5 text-center">
                                 {product.unidadesPorBulto ? (
-                                  product.seDivideEn && product.seDivideEn > 1
-                                    ? `${product.unidadesPorBulto}u ÷${product.seDivideEn}`
-                                    : `${product.unidadesPorBulto}u`
-                                ) : "—"}
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700 transition-colors">
+                                        {product.seDivideEn && product.seDivideEn > 1
+                                          ? Math.round(product.unidadesPorBulto / product.seDivideEn)
+                                          : product.unidadesPorBulto}
+                                        <Eye className="h-3 w-3 text-muted-foreground" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-48 p-3 text-xs space-y-1.5" side="left">
+                                      <p className="font-semibold text-foreground mb-2">Detalle de lote</p>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Bulto</span>
+                                        <span className="font-medium">1</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Unidades total</span>
+                                        <span className="font-medium">{product.unidadesPorBulto}</span>
+                                      </div>
+                                      {product.seDivideEn && product.seDivideEn > 1 && (
+                                        <>
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Se divide en</span>
+                                            <span className="font-medium">{product.seDivideEn}</span>
+                                          </div>
+                                          <div className="flex justify-between border-t pt-1.5 mt-1">
+                                            <span className="text-muted-foreground">Unid. venta</span>
+                                            <span className="font-semibold text-teal-600">{Math.round(product.unidadesPorBulto / product.seDivideEn)}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                    </PopoverContent>
+                                  </Popover>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
                               </td>
                               <td className="px-3 py-2.5 text-center">
                                 <div className="flex items-center justify-center gap-0.5">
