@@ -3,20 +3,18 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { formatPrice, formatDateTime as formatDate } from "@/lib/utils/format";
 import type { Order } from "@/lib/types";
-import { Eye, User, Box, CheckCircle, MapPin } from "lucide-react";
-import { statusConfig, statusFlow } from "@/lib/order-constants"; //
+import { Eye, CheckCircle } from "lucide-react";
+import { statusConfig } from "@/lib/order-constants";
+import { cn } from "@/lib/utils";
 
 const generateOrderNumber = (createdAt: Date | string, index: number) => {
   const date = new Date(createdAt);
   const year = date.getFullYear().toString().slice(-2);
   const month = (date.getMonth() + 1).toString().padStart(2, "0");
   const day = date.getDate().toString().padStart(2, "0");
-  const orderNum = (index + 1).toString().padStart(4, "0");
-  return `${year}${month}${day}-${orderNum}`;
+  return `${year}${month}${day}-${(index + 1).toString().padStart(4, "0")}`;
 };
 
 interface OrderCardProps {
@@ -45,17 +43,27 @@ export function OrderCard({
     bgColor: "bg-gray-50",
     borderColor: "border-gray-200",
   };
-  const isCompleted = order.status === "completed";
-  const orderNumber = generateOrderNumber(
-    order.createdAt,
-    totalOrders - 1 - index,
+  const orderNumber = generateOrderNumber(order.createdAt, totalOrders - 1 - index);
+
+  const productosResumen = order.items
+    .map((i) => `${i.quantity}× ${i.name}`)
+    .join(" · ");
+
+  const StatusBadge = () => (
+    <div className={cn(
+      "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold",
+      config.bgColor, "border", config.borderColor
+    )}>
+      <div className={cn("w-1.5 h-1.5 rounded-full", config.dotColor)} />
+      <span className={config.color}>{config.label}</span>
+    </div>
   );
 
   if (variant === "table") {
     return (
-      <tr className="hover:bg-gray-50/80 transition-colors group">
+      <tr className="hover:bg-muted/30 transition-colors group text-sm border-b border-border/50 last:border-0">
         {onToggleSelect && (
-          <td className="px-3 py-4 w-8">
+          <td className="pl-3 pr-1 py-3 w-8">
             <input
               type="checkbox"
               checked={!!isSelected}
@@ -65,145 +73,94 @@ export function OrderCard({
             />
           </td>
         )}
-        <td className="px-4 py-4">
-          <div>
-            <p className="font-bold text-gray-900 font-mono text-sm">
-              #{orderNumber}
+        {/* # + fecha */}
+        <td className="px-3 py-3 whitespace-nowrap">
+          <p className="font-mono font-bold text-xs text-foreground">#{orderNumber}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{formatDate(order.createdAt)}</p>
+          {order.status === "completed" && order.saleId && (
+            <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-0.5">
+              <CheckCircle className="h-3 w-3" /> {order.saleId.slice(-6)}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-              {formatDate(order.createdAt)}
-            </p>
-            {isCompleted && order.saleId && (
-              <p className="text-xs text-green-600 mt-1 font-medium flex items-center gap-1">
-                <CheckCircle className="h-3 w-3" />
-                Venta: {order.saleId.slice(-6)}
-              </p>
-            )}
-          </div>
+          )}
         </td>
-        <td className="px-4 py-4">
-          <p className="text-sm font-semibold text-gray-900">
-            {order.clientName || (
-              <span className="text-gray-400 italic">Venta directa</span>
-            )}
+        {/* Cliente + vendedor */}
+        <td className="px-3 py-3">
+          <p className="font-semibold truncate max-w-[140px]">
+            {order.clientName || <span className="text-muted-foreground italic text-xs">Sin cliente</span>}
           </p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {order.sellerName || "Sin vendedor"}
+          {order.sellerName && (
+            <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">{order.sellerName}</p>
+          )}
+        </td>
+        {/* Productos */}
+        <td className="px-3 py-3 max-w-[220px]">
+          <p className="text-xs text-foreground truncate" title={productosResumen}>{productosResumen}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {order.items.length} {order.items.length === 1 ? "producto" : "productos"}
           </p>
         </td>
-        <td className="px-4 py-4">
-          <p className="text-sm text-gray-700 truncate max-w-[200px]">
-            {order.address && order.address !== "Retiro en local" ? order.address : (
-              <span className="text-gray-400 italic">Retiro en local</span>
-            )}
+        {/* Dirección */}
+        <td className="px-3 py-3 hidden md:table-cell">
+          <p className="text-xs text-muted-foreground truncate max-w-[180px]">
+            {order.address && order.address !== "Retiro en local"
+              ? order.address
+              : <span className="italic">Retiro en local</span>}
           </p>
+          {order.city && <p className="text-[10px] text-muted-foreground/70">{order.city}</p>}
         </td>
-        <td className="px-4 py-4">
-          <div className="flex items-center gap-2">
-            <Box className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-700">
-              {order.items.length}{" "}
-              {order.items.length === 1 ? "producto" : "productos"}
-            </span>
-          </div>
+        {/* Estado */}
+        <td className="px-3 py-3 whitespace-nowrap">
+          <StatusBadge />
         </td>
-        <td className="px-4 py-4">
-          <div
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${config.bgColor} border ${config.borderColor}`}
-          >
-            <div
-              className={`w-2 h-2 rounded-full ${config.dotColor} animate-pulse`}
-            />
-            <span className={`text-sm font-semibold ${config.color}`}>
-              {config.label}
-            </span>
-          </div>
-        </td>
-        <td className="px-4 py-4 text-right">
+        {/* Acción */}
+        <td className="px-3 py-3 text-right">
           <Button
-            variant="ghost"
-            size="sm"
+            variant="ghost" size="sm"
             onClick={onViewDetails}
-            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-2 group-hover:bg-blue-50/50"
+            className="h-8 text-xs gap-1.5 text-primary hover:bg-primary/5"
           >
-            <Eye className="h-4 w-4" />
-            <span className="hidden sm:inline">Ver detalles</span>
+            <Eye className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Ver</span>
           </Button>
         </td>
       </tr>
     );
   }
 
+  // Mobile card
   return (
-    <Card className="overflow-hidden border-gray-200 hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <p className="font-bold text-gray-900 font-mono text-sm">
-              #{orderNumber}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {formatDate(order.createdAt)}
-            </p>
-          </div>
-          <div
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${config.bgColor} border ${config.borderColor}`}
-          >
-            <div className={`w-1.5 h-1.5 rounded-full ${config.dotColor}`} />
-            <span className={`text-xs font-semibold ${config.color}`}>
-              {config.label}
-            </span>
-          </div>
+    <div
+      className={cn(
+        "rounded-xl border p-3 space-y-2 cursor-pointer hover:bg-muted/20 transition-colors",
+        isSelected && "border-teal-400 bg-teal-50/30"
+      )}
+      onClick={onViewDetails}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="font-mono font-bold text-xs text-foreground">#{orderNumber}</p>
+          <p className="text-[10px] text-muted-foreground">{formatDate(order.createdAt)}</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <StatusBadge />
           {onToggleSelect && (
             <input
               type="checkbox"
               checked={!!isSelected}
               onChange={onToggleSelect}
               onClick={(e) => e.stopPropagation()}
-              className="h-5 w-5 rounded border-gray-300 accent-teal-600 cursor-pointer ml-2"
+              className="h-4 w-4 rounded border-gray-300 accent-teal-600 cursor-pointer"
             />
           )}
         </div>
-
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center gap-2 text-sm">
-            <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
-            <span className="font-medium text-gray-900 truncate">
-              {order.clientName || "Venta directa"}
-            </span>
-          </div>
-          {order.address && order.address !== "Retiro en local" && (
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              <span className="text-gray-600 truncate">{order.address}</span>
-            </div>
-          )}
-          <div className="flex items-center gap-2 text-sm">
-            <Box className="h-4 w-4 text-gray-400 flex-shrink-0" />
-            <span className="text-gray-600">
-              {order.items.length}{" "}
-              {order.items.length === 1 ? "producto" : "productos"}
-            </span>
-          </div>
-          {isCompleted && order.saleId && (
-            <div className="flex items-center gap-2 text-sm text-green-600">
-              <CheckCircle className="h-4 w-4 flex-shrink-0" />
-              <span className="font-medium">
-                Venta: {order.saleId.slice(-6)}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <Button
-          variant="outline"
-          className="w-full border-gray-300 hover:bg-gray-50 hover:border-gray-400"
-          onClick={onViewDetails}
-        >
-          <Eye className="h-4 w-4 mr-2 text-blue-600" />
-          Ver detalles
-        </Button>
-      </CardContent>
-    </Card>
+      </div>
+      <p className="text-sm font-semibold truncate">
+        {order.clientName || <span className="text-muted-foreground italic">Sin cliente</span>}
+      </p>
+      <p className="text-xs text-muted-foreground truncate" title={productosResumen}>{productosResumen}</p>
+      {order.address && order.address !== "Retiro en local" && (
+        <p className="text-xs text-muted-foreground truncate">{order.address}</p>
+      )}
+    </div>
   );
 }

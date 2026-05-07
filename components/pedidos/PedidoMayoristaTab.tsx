@@ -15,9 +15,11 @@ import {
   actualizarEstadoPedidoMayorista,
   getPedidosMayorista,
 } from "@/services/pedidos-mayorista-service";
-import type { Sale, MayoristaProducto, PedidoMayorista } from "@/lib/types";
+import { ordersApi } from "@/lib/api";
+import type { Sale, MayoristaProducto, PedidoMayorista, Order } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 interface ItemConsolidado {
   productoId: string;
@@ -33,25 +35,35 @@ interface ItemConsolidado {
 
 export function PedidoMayoristaTab() {
   const [ventasPendientes, setVentasPendientes] = useState<Sale[]>([]);
+  const [ordenesActivas, setOrdenesActivas] = useState<Order[]>([]);
   const [productosMap, setProductosMap] = useState<Map<string, MayoristaProducto>>(new Map());
   const [pedidos, setPedidos] = useState<PedidoMayorista[]>([]);
   const [loading, setLoading] = useState(true);
   const [generando, setGenerando] = useState(false);
   const [enviando, setEnviando] = useState<string | null>(null);
+  // Overrides manuales de lotesAPedir: productoId → lotes
+  const [overrides, setOverrides] = useState<Map<string, number>>(new Map());
+
+  const setOverride = (productoId: string, value: number) => {
+    setOverrides((prev) => { const n = new Map(prev); n.set(productoId, value); return n; });
+  };
 
   const cargar = useCallback(async () => {
     setLoading(true);
+    setOverrides(new Map());
     try {
-      const [ventas, productos, pedidosData] = await Promise.all([
+      const [ventas, productos, pedidosData, ordenes] = await Promise.all([
         getSalesPendientesMayorista(),
         getMayoristaProductos(),
         getPedidosMayorista(),
+        ordersApi.getAll(),
       ]);
       setVentasPendientes(ventas);
       const map = new Map<string, MayoristaProducto>();
       productos.forEach((p) => map.set(p.id, p));
       setProductosMap(map);
       setPedidos(pedidosData);
+      setOrdenesActivas(ordenes.filter((o) => o.status !== "completed"));
     } catch {
       toast.error("Error al cargar datos");
     } finally {
@@ -61,23 +73,38 @@ export function PedidoMayoristaTab() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  // Consolidar todos los cantidadPendienteMayorista de ventas pendientes
+  // Consolidar: ventas pendientes (cantidadPendienteMayorista) + pedidos activos (déficit stockLocal)
   const itemsConsolidados = useMemo<ItemConsolidado[]>(() => {
     const acum = new Map<string, number>();
+
+    // Fuente 1: ventas en modo "esperar" con cantidadPendienteMayorista
     for (const venta of ventasPendientes) {
       for (const item of (venta.items ?? []) as any[]) {
         const pendiente = item.cantidadPendienteMayorista ?? 0;
         if (pendiente <= 0) continue;
-        const productoId = item.productId;
-        acum.set(productoId, (acum.get(productoId) ?? 0) + pendiente);
+        acum.set(item.productId, (acum.get(item.productId) ?? 0) + pendiente);
       }
     }
+
+    // Fuente 2: órdenes activas de Entregas donde stockLocal < quantity
+    for (const orden of ordenesActivas) {
+      for (const item of orden.items) {
+        const prod = productosMap.get(item.productId);
+        if (!prod) continue; // no es producto mayorista
+        const stockLocal = prod.stockLocal ?? 0;
+        const deficit = Math.max(0, item.quantity - stockLocal);
+        if (deficit <= 0) continue;
+        acum.set(item.productId, (acum.get(item.productId) ?? 0) + deficit);
+      }
+    }
+
     return Array.from(acum.entries()).map(([productoId, unidadesPedidas]) => {
       const prod = productosMap.get(productoId);
       const unidadesPorBulto = prod?.unidadesPorBulto ?? 1;
       const seDivideEn = prod?.seDivideEn ?? 1;
       const unidadesPorPorcion = seDivideEn > 0 ? Math.round(unidadesPorBulto / seDivideEn) : unidadesPorBulto;
-      const lotesAPedir = Math.ceil(unidadesPedidas / unidadesPorBulto);
+      const lotesCalculados = Math.ceil(unidadesPedidas / unidadesPorBulto);
+      const lotesAPedir = overrides.get(productoId) ?? lotesCalculados;
       const sobrante = lotesAPedir * unidadesPorBulto - unidadesPedidas;
       return {
         productoId,
@@ -91,7 +118,14 @@ export function PedidoMayoristaTab() {
         precioMayorista: prod?.precioUnitarioMayorista ?? 0,
       };
     }).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-  }, [ventasPendientes, productosMap]);
+  }, [ventasPendientes, ordenesActivas, productosMap, overrides]);
+
+  const totalFuentes = ventasPendientes.length + ordenesActivas.filter((o) =>
+    o.items.some((item) => {
+      const prod = productosMap.get(item.productId);
+      return prod && (prod.stockLocal ?? 0) < item.quantity;
+    })
+  ).length;
 
   const totalEstimado = useMemo(
     () => itemsConsolidados.reduce((acc, i) => acc + i.unidadesPedidas * i.precioMayorista, 0),
@@ -234,7 +268,10 @@ export function PedidoMayoristaTab() {
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm flex items-center gap-2">
             <Package className="h-4 w-4 text-teal-600" />
-            Pendiente de {ventasPendientes.length} venta{ventasPendientes.length !== 1 ? "s" : ""}
+            Pendiente de {totalFuentes} fuente{totalFuentes !== 1 ? "s" : ""}
+            <span className="text-xs font-normal text-muted-foreground">
+              ({ventasPendientes.length} venta{ventasPendientes.length !== 1 ? "s" : ""} + entregas)
+            </span>
           </h3>
           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={cargar}>
             <RefreshCw className="h-3.5 w-3.5" />
@@ -259,43 +296,69 @@ export function PedidoMayoristaTab() {
                     <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Producto</th>
                     <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Pedidas</th>
                     <th className="text-right px-3 py-2 font-semibold text-muted-foreground hidden sm:table-cell">Lote</th>
-                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Lotes a pedir</th>
+                    <th className="text-center px-3 py-2 font-semibold text-muted-foreground w-28">Lotes a pedir</th>
                     <th className="text-right px-3 py-2 font-semibold text-muted-foreground hidden md:table-cell">Sobrante</th>
                     <th className="text-right px-3 py-2 font-semibold text-muted-foreground hidden lg:table-cell">$ May.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {itemsConsolidados.map((item) => (
-                    <tr key={item.productoId} className="hover:bg-muted/20">
-                      <td className="px-3 py-2 font-medium max-w-[160px]">
-                        <p className="truncate">{item.nombre}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {item.seDivideEn > 1
-                            ? `${item.unidadesPorPorcion} u/porción · ${item.seDivideEn} porciones`
-                            : `${item.unidadesPorBulto} u/lote`}
-                        </p>
-                      </td>
-                      <td className="px-3 py-2 text-right align-top">{item.unidadesPedidas} u</td>
-                      <td className="px-3 py-2 text-right align-top hidden sm:table-cell text-muted-foreground">
-                        {item.unidadesPorBulto} u
-                        {item.seDivideEn > 1 && <span className="text-[10px] block">÷{item.seDivideEn}</span>}
-                      </td>
-                      <td className="px-3 py-2 text-right align-top font-bold text-primary">
-                        {item.lotesAPedir}
-                        <span className="font-normal text-muted-foreground"> lote{item.lotesAPedir !== 1 ? "s" : ""}</span>
-                      </td>
-                      <td className="px-3 py-2 text-right align-top hidden md:table-cell">
-                        {item.sobrante > 0 ? (
-                          <span className="text-amber-600 font-medium">{item.sobrante} u</span>
-                        ) : (
-                          <span className="text-emerald-600">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right align-top text-muted-foreground hidden lg:table-cell">
-                        {item.precioMayorista > 0 ? formatCurrency(item.precioMayorista) : "—"}
-                      </td>
-                    </tr>
-                  ))}
+                  {itemsConsolidados.map((item) => {
+                    const isOverridden = overrides.has(item.productoId);
+                    return (
+                      <tr key={item.productoId} className="hover:bg-muted/20">
+                        <td className="px-3 py-2 font-medium max-w-[160px]">
+                          <p className="truncate">{item.nombre}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {item.seDivideEn > 1
+                              ? `${item.unidadesPorPorcion} u/porción · ${item.seDivideEn} porciones`
+                              : `${item.unidadesPorBulto} u/lote`}
+                          </p>
+                        </td>
+                        <td className="px-3 py-2 text-right align-middle">{item.unidadesPedidas} u</td>
+                        <td className="px-3 py-2 text-right align-middle hidden sm:table-cell text-muted-foreground">
+                          {item.unidadesPorBulto} u
+                          {item.seDivideEn > 1 && <span className="text-[10px] block">÷{item.seDivideEn}</span>}
+                        </td>
+                        <td className="px-3 py-2 align-middle">
+                          <div className="flex items-center justify-center gap-1">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={item.lotesAPedir}
+                              onChange={(e) => setOverride(item.productoId, Math.max(0, parseInt(e.target.value) || 0))}
+                              className={cn(
+                                "h-7 w-14 text-center text-xs font-bold px-1",
+                                isOverridden && "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
+                              )}
+                            />
+                            <span className="text-muted-foreground text-[10px] whitespace-nowrap">
+                              lote{item.lotesAPedir !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          {isOverridden && (
+                            <button
+                              className="text-[10px] text-muted-foreground underline block mx-auto mt-0.5"
+                              onClick={() => { const n = new Map(overrides); n.delete(item.productoId); setOverrides(n); }}
+                            >
+                              restaurar
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right align-middle hidden md:table-cell">
+                          {item.sobrante > 0 ? (
+                            <span className="text-amber-600 font-medium">{item.sobrante} u</span>
+                          ) : item.sobrante < 0 ? (
+                            <span className="text-destructive font-medium">{item.sobrante} u</span>
+                          ) : (
+                            <span className="text-emerald-600">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right align-middle text-muted-foreground hidden lg:table-cell">
+                          {item.precioMayorista > 0 ? formatCurrency(item.precioMayorista) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

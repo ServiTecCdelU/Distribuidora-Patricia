@@ -939,18 +939,19 @@ export default function PedidosPage() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden lg:block bg-white border rounded-xl overflow-hidden shadow-sm mb-3">
-                <table className="w-full">
-                  <thead className="bg-gray-50/80 border-b">
-                    <tr>
+              <div className="hidden lg:block border rounded-xl overflow-hidden shadow-sm mb-3">
+                <table className="w-full table-fixed">
+                  <thead className="bg-muted/50 border-b">
+                    <tr className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       {user?.role === "admin" && (
-                        <th className="px-3 py-3 w-8"></th>
+                        <th className="pl-3 pr-1 py-2.5 w-8"></th>
                       )}
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pedido</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Dirección</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Productos</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Estado</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Acción</th>
+                      <th className="px-3 py-2.5 text-left w-28">Pedido</th>
+                      <th className="px-3 py-2.5 text-left w-36">Cliente</th>
+                      <th className="px-3 py-2.5 text-left">Productos</th>
+                      <th className="px-3 py-2.5 text-left w-44 hidden md:table-cell">Dirección</th>
+                      <th className="px-3 py-2.5 text-left w-32">Estado</th>
+                      <th className="px-3 py-2.5 text-right w-16"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
