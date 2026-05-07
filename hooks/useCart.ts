@@ -282,19 +282,28 @@ export function useCart(role: UserRole, userEmail?: string) {
           sellersApi.getAll(),
         ]);
         // Convertir MayoristaProducto a Product (solo habilitados, stock=9999 para no restringir pedidos)
-        const productsData = mayoristaData.filter((p) => p.habilitado).map((p) => ({
-          id: p.id,
-          name: p.nombre,
-          description: p.codigo,
-          price: p.precioVenta,
-          stock: 9999,
-          stockLocal: p.stockLocal,
-          unidadesPorBulto: p.unidadesPorBulto,
-          codigo: p.codigo,
-          imageUrl: "",
-          category: p.categoria,
-          createdAt: p.updatedAt,
-        }));
+        const productsData = mayoristaData.filter((p) => p.habilitado).map((p) => {
+          // Precio de lote: precioVenta × (unidadesPorBulto / seDivideEn)
+          // Cada "venta" es una porción de (unidadesPorBulto / seDivideEn) unidades
+          const precioLote =
+            p.unidadesPorBulto && p.seDivideEn && p.seDivideEn > 1
+              ? Math.round(p.precioVenta * p.unidadesPorBulto / p.seDivideEn * 100) / 100
+              : p.precioVenta;
+          return {
+            id: p.id,
+            name: p.nombre,
+            description: p.codigo,
+            price: precioLote,
+            stock: 9999,
+            stockLocal: p.stockLocal,
+            unidadesPorBulto: p.unidadesPorBulto,
+            seDivideEn: p.seDivideEn,
+            codigo: p.codigo,
+            imageUrl: "",
+            category: p.categoria,
+            createdAt: p.updatedAt,
+          };
+        });
         setProducts(productsData);
         setClients(clientsData);
         setSellers(sellersData.filter((s) => s.isActive));

@@ -262,7 +262,10 @@ function VendedorDashboard({ userEmail, userName }: { userEmail: string; userNam
                           {product.category}
                         </td>
                         <td className="px-3 py-2.5 text-right font-semibold text-teal-600 whitespace-nowrap">
-                          {formatCurrency(product.price)}
+                          <span>{formatCurrency(product.price)}</span>
+                          {product.seDivideEn && product.seDivideEn > 1 && (
+                            <span className="block text-[10px] font-normal text-muted-foreground">/ lote</span>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 text-right hidden sm:table-cell">
                           <span className={cn(

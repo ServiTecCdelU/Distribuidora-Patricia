@@ -394,7 +394,12 @@ const ProductListItem = memo(function ProductListItem({
           `${stockDisplay} u`
         )}
       </td>
-      <td className="py-1.5 px-2 text-xs font-semibold text-right whitespace-nowrap">{formatCurrency(product.price)}</td>
+      <td className="py-1.5 px-2 text-xs font-semibold text-right whitespace-nowrap">
+        <span>{formatCurrency(product.price)}</span>
+        {esMayorista && product.seDivideEn && product.seDivideEn > 1 && (
+          <span className="block text-[10px] font-normal text-muted-foreground">/ lote</span>
+        )}
+      </td>
       <td className="py-1.5 pl-2 pr-3 text-center w-8">
         {quantity > 0 && (
           <span className="inline-flex h-5 w-5 rounded-full bg-primary text-primary-foreground items-center justify-center text-[10px] font-bold">
