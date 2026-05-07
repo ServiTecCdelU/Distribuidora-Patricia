@@ -1517,10 +1517,10 @@ export default function ProductosPage() {
                                 {product.category}
                               </td>
                               <td className="px-3 py-2.5 text-right font-semibold text-teal-600 whitespace-nowrap">
-                                {product.seDivideEn && product.seDivideEn > 1
-                                  ? formatCurrency(Math.round(product.price * product.seDivideEn * 100) / 100)
+                                {product.unidadesPorBulto && product.seDivideEn && product.unidadesPorBulto > 0
+                                  ? formatCurrency(Math.round(product.price * product.seDivideEn / product.unidadesPorBulto * 100) / 100)
                                   : formatCurrency(product.price)}
-                                {product.seDivideEn && product.seDivideEn > 1 && (
+                                {product.unidadesPorBulto && product.seDivideEn && product.unidadesPorBulto > 0 && (
                                   <span className="block text-[10px] font-normal text-muted-foreground">/ lote</span>
                                 )}
                               </td>
@@ -1565,7 +1565,7 @@ export default function ProductosPage() {
                                           </div>
                                           <div className="flex justify-between border-t pt-1.5 mt-1">
                                             <span className="text-muted-foreground">Precio por lote</span>
-                                            <span className="font-semibold text-teal-600">{formatCurrency(Math.round(product.price * product.seDivideEn * 100) / 100)}</span>
+                                            <span className="font-semibold text-teal-600">{formatCurrency(Math.round(product.price * product.seDivideEn / product.unidadesPorBulto! * 100) / 100)}</span>
                                           </div>
                                         </>
                                       )}

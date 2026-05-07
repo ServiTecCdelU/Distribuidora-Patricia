@@ -283,12 +283,11 @@ export function useCart(role: UserRole, userEmail?: string) {
         ]);
         // Convertir MayoristaProducto a Product (solo habilitados, stock=9999 para no restringir pedidos)
         const productsData = mayoristaData.filter((p) => p.habilitado).map((p) => {
-          // Precio de lote: precioVenta × seDivideEn
-          // precioVenta = precio por unidad; seDivideEn = unidades por lote de venta
-          // Ej: $1000/unidad × 10 unidades/lote = $10.000 por lote
+          // Precio de lote: precioVenta (precio del bulto entero) × seDivideEn / unidadesPorBulto
+          // Ej: bulto $36.000, 30 unidades, se divide en 10 → $36.000 × 10 / 30 = $12.000/lote
           const precioLote =
-            p.seDivideEn && p.seDivideEn > 1
-              ? Math.round(p.precioVenta * p.seDivideEn * 100) / 100
+            p.unidadesPorBulto && p.seDivideEn && p.unidadesPorBulto > 0
+              ? Math.round(p.precioVenta * p.seDivideEn / p.unidadesPorBulto * 100) / 100
               : p.precioVenta;
           return {
             id: p.id,
