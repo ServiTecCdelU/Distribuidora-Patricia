@@ -1486,6 +1486,7 @@ export default function ProductosPage() {
                           <th className="text-left px-3 py-3 font-semibold text-muted-foreground">Categoría</th>
                           <th className="text-right px-3 py-3 font-semibold text-muted-foreground whitespace-nowrap">Precio</th>
                           <th className="text-right px-3 py-3 font-semibold text-muted-foreground">Stock</th>
+                          <th className="text-center px-3 py-3 font-semibold text-muted-foreground whitespace-nowrap">Lote</th>
                           <th className="text-center px-3 py-3 font-semibold text-muted-foreground">Acciones</th>
                         </tr>
                       </thead>
@@ -1527,6 +1528,13 @@ export default function ProductosPage() {
                                 >
                                   {product.stock}
                                 </Badge>
+                              </td>
+                              <td className="px-3 py-2.5 text-center text-xs text-muted-foreground whitespace-nowrap">
+                                {product.unidadesPorBulto ? (
+                                  product.seDivideEn && product.seDivideEn > 1
+                                    ? `${product.unidadesPorBulto}u ÷${product.seDivideEn}`
+                                    : `${product.unidadesPorBulto}u`
+                                ) : "—"}
                               </td>
                               <td className="px-3 py-2.5 text-center">
                                 <div className="flex items-center justify-center gap-0.5">

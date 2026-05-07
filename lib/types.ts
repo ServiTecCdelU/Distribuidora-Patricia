@@ -126,7 +126,7 @@ export interface Order {
   sellerName?: string;
   transportistaId?: string;
   transportistaName?: string;
-  items: { productId: string; quantity: number; name: string; price: number; itemDiscount?: number }[];
+  items: { productId: string; quantity: number; name: string; price: number; itemDiscount?: number; unidadesPorBulto?: number; seDivideEn?: number; precioUnitarioMayorista?: number }[];
   status: "pending" | "preparation" | "delivery" | "completed";
   city?: City;
   address: string;

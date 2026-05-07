@@ -521,11 +521,25 @@ export default function PedidosPage() {
       // Usar orders ya cargados en estado — sin fetches adicionales
       const activos = orders.filter((o) => o.status !== "completed");
 
-      // Consolidar items por nombre de producto
-      const acum = new Map<string, number>();
+      // Consolidar items por nombre de producto, conservando datos de lote
+      type AcumItem = { nombre: string; cantidad: number; unidadesPorBulto?: number; precioUnitarioMayorista?: number };
+      const acum = new Map<string, AcumItem>();
       for (const orden of activos) {
         for (const item of orden.items) {
-          acum.set(item.name, (acum.get(item.name) ?? 0) + item.quantity);
+          const existing = acum.get(item.name);
+          if (existing) {
+            existing.cantidad += item.quantity;
+            // Si antes no teníamos datos de lote y ahora sí, los tomamos
+            if (!existing.unidadesPorBulto && item.unidadesPorBulto) existing.unidadesPorBulto = item.unidadesPorBulto;
+            if (!existing.precioUnitarioMayorista && item.precioUnitarioMayorista) existing.precioUnitarioMayorista = item.precioUnitarioMayorista;
+          } else {
+            acum.set(item.name, {
+              nombre: item.name,
+              cantidad: item.quantity,
+              unidadesPorBulto: item.unidadesPorBulto,
+              precioUnitarioMayorista: item.precioUnitarioMayorista,
+            });
+          }
         }
       }
 
@@ -534,18 +548,34 @@ export default function PedidosPage() {
         return;
       }
 
-      const filas = Array.from(acum.entries())
-        .map(([nombre, cantidad]) => ({ nombre, cantidad }))
-        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+      const filas = Array.from(acum.values())
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+        .map((f) => {
+          const bultos = f.unidadesPorBulto && f.unidadesPorBulto > 0
+            ? Math.ceil(f.cantidad / f.unidadesPorBulto)
+            : "";
+          const precioTotal = (bultos !== "" && f.unidadesPorBulto && f.precioUnitarioMayorista)
+            ? Math.round((bultos as number) * f.unidadesPorBulto * f.precioUnitarioMayorista * 100) / 100
+            : "";
+          return { ...f, bultos, precioTotal };
+        });
 
       // CSV con BOM para Excel en español (separador ;)
       const sep = ";";
       const esc = (v: string | number) =>
         typeof v === "string" ? `"${v.replace(/"/g, '""')}"` : String(v);
 
-      const cabecera = ["Producto", "Unidades totales pedidas"].map(esc).join(sep);
-      const cuerpo = filas.map((f) => [f.nombre, f.cantidad].map(esc).join(sep));
-      const pie = ["TOTAL", filas.reduce((s, r) => s + r.cantidad, 0)].map(esc).join(sep);
+      const cabecera = ["Producto", "Unidades pedidas", "Bultos", "Precio x bulto", "Total estimado"].map(esc).join(sep);
+      const cuerpo = filas.map((f) => [
+        f.nombre,
+        f.cantidad,
+        f.bultos !== "" ? f.bultos : "—",
+        f.precioUnitarioMayorista ? f.precioUnitarioMayorista : "—",
+        f.precioTotal !== "" ? f.precioTotal : "—",
+      ].map(esc).join(sep));
+      const totalUnidades = filas.reduce((s, r) => s + r.cantidad, 0);
+      const totalPrecio = filas.reduce((s, r) => s + (typeof r.precioTotal === "number" ? r.precioTotal : 0), 0);
+      const pie = ["TOTAL", totalUnidades, "", "", totalPrecio > 0 ? totalPrecio : "—"].map(esc).join(sep);
 
       const csv = "\uFEFF" + [cabecera, ...cuerpo, pie].join("\r\n");
 
