@@ -425,6 +425,8 @@ export function UnifiedCart({ role, state, actions, onConfirmSale, allowDiscount
           onClientNameChange={actions.setClientName}
           onClientEmailChange={actions.setClientEmail}
           onClientPhoneChange={actions.setClientPhone}
+          clients={state.clients}
+          onSelectFromSearch={actions.selectClientFromSearch}
         />
         )}
 
@@ -743,14 +745,15 @@ function ClientLookupSection({
   onLookupTypeChange, onLookupChange, onOpenNewClient,
   clientMissingData, onEditClient,
   onClientNameChange, onClientEmailChange, onClientPhoneChange,
+  clients, onSelectFromSearch,
 }: {
   role: UserRole;
-  lookupType: "dni" | "cuit";
+  lookupType: "dni" | "cuit" | "search";
   dniLookup: string; dniLoading: boolean; dniFound: boolean; dniNotFound: boolean;
   clientName: string; clientEmail: string; clientPhone: string; clientAddress: string;
   selectedClientData: CartState["selectedClientData"];
   formatCurrency: (n: number) => string;
-  onLookupTypeChange: (type: "dni" | "cuit") => void;
+  onLookupTypeChange: (type: "dni" | "cuit" | "search") => void;
   onLookupChange: (v: string) => void;
   onOpenNewClient: () => void;
   clientMissingData: string[] | null;
@@ -758,11 +761,34 @@ function ClientLookupSection({
   onClientNameChange?: (v: string) => void;
   onClientEmailChange?: (v: string) => void;
   onClientPhoneChange?: (v: string) => void;
+  clients?: import("@/lib/types").Client[];
+  onSelectFromSearch?: (clientId: string) => void;
 }) {
-  const handleToggle = (type: "dni" | "cuit") => {
+  const [searchText, setSearchText] = useState("");
+
+  const normalize = (s: string) =>
+    (s ?? "").toLowerCase().replace(/[\s.\-_()/]/g, "");
+
+  const searchResults = useMemo(() => {
+    if (lookupType !== "search" || searchText.trim().length < 2) return [];
+    const q = normalize(searchText);
+    return (clients ?? [])
+      .filter((c) =>
+        normalize(c.name).includes(q) ||
+        normalize(c.email).includes(q) ||
+        normalize(c.phone).includes(q) ||
+        normalize(c.dni ?? "").includes(q) ||
+        normalize(c.cuit).includes(q) ||
+        normalize(c.address).includes(q)
+      )
+      .slice(0, 8);
+  }, [searchText, lookupType, clients]);
+
+  const handleToggle = (type: "dni" | "cuit" | "search") => {
     if (type !== lookupType) {
       onLookupChange("");
       onLookupTypeChange(type);
+      setSearchText("");
     }
   };
 
@@ -905,7 +931,7 @@ function ClientLookupSection({
     );
   }
 
-  // Admin/Seller: existing DNI/CUIT lookup flow
+  // Admin/Seller: DNI / CUIT / Búsqueda libre
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -921,27 +947,78 @@ function ClientLookupSection({
         </Button>
       </div>
 
-      {/* Toggle DNI / CUIT */}
+      {/* Toggle DNI / CUIT / Buscar */}
       <div className="flex gap-1">
-        <Button
-          type="button" size="sm"
+        <Button type="button" size="sm"
           variant={lookupType === "dni" ? "default" : "outline"}
-          className="h-7 text-[11px] px-3 flex-1"
+          className="h-7 text-[11px] px-2 flex-1"
           onClick={() => handleToggle("dni")}
-        >
-          DNI
-        </Button>
-        <Button
-          type="button" size="sm"
+        >DNI</Button>
+        <Button type="button" size="sm"
           variant={lookupType === "cuit" ? "default" : "outline"}
-          className="h-7 text-[11px] px-3 flex-1"
+          className="h-7 text-[11px] px-2 flex-1"
           onClick={() => handleToggle("cuit")}
-        >
-          CUIT / CUIL
-        </Button>
+        >CUIT</Button>
+        <Button type="button" size="sm"
+          variant={lookupType === "search" ? "default" : "outline"}
+          className="h-7 text-[11px] px-2 flex-1"
+          onClick={() => handleToggle("search")}
+        >Buscar</Button>
       </div>
 
-      {/* Input */}
+      {/* Modo búsqueda libre */}
+      {lookupType === "search" && (
+        dniFound ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-emerald-600 font-medium truncate">Cliente: {clientName}</p>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button type="button" variant="ghost" size="sm"
+                className="h-5 text-[10px] text-primary px-1.5 hover:bg-primary/5"
+                onClick={onEditClient}>Editar</Button>
+              <Button type="button" variant="ghost" size="sm"
+                className="h-5 text-[10px] text-muted-foreground px-1.5 hover:text-destructive"
+                onClick={() => { onLookupChange(""); setSearchText(""); }}>Cambiar</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1 relative">
+            <Input
+              placeholder="Nombre, email, teléfono, DNI..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="h-9 text-sm"
+              autoFocus
+            />
+            {searchText.trim().length >= 2 && (
+              <div className="rounded-lg border border-border bg-popover shadow-md overflow-hidden">
+                {searchResults.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-3 py-2">Sin resultados</p>
+                ) : (
+                  <ul className="divide-y divide-border max-h-52 overflow-y-auto">
+                    {searchResults.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors"
+                          onClick={() => { onSelectFromSearch?.(c.id); setSearchText(""); }}
+                        >
+                          <p className="text-xs font-medium truncate">{c.name}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {[c.email, c.phone, c.dni].filter(Boolean).join(" · ")}
+                          </p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      )}
+
+      {/* Modo DNI / CUIT */}
+      {lookupType !== "search" && (
       <div className="space-y-2">
         <Input
           placeholder={lookupType === "dni" ? "Ej: 30123456" : "Ej: 20-30123456-9"}
@@ -955,20 +1032,12 @@ function ClientLookupSection({
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-emerald-600 font-medium truncate">Cliente encontrado: {clientName}</p>
             <div className="flex items-center gap-1 shrink-0">
-              <Button
-                type="button" variant="ghost" size="sm"
+              <Button type="button" variant="ghost" size="sm"
                 className="h-5 text-[10px] text-primary px-1.5 hover:bg-primary/5"
-                onClick={onEditClient}
-              >
-                Editar
-              </Button>
-              <Button
-                type="button" variant="ghost" size="sm"
+                onClick={onEditClient}>Editar</Button>
+              <Button type="button" variant="ghost" size="sm"
                 className="h-5 text-[10px] text-muted-foreground px-1.5 hover:text-destructive"
-                onClick={() => onLookupChange("")}
-              >
-                Cambiar
-              </Button>
+                onClick={() => onLookupChange("")}>Cambiar</Button>
             </div>
           </div>
         )}
@@ -976,6 +1045,7 @@ function ClientLookupSection({
           <p className="text-xs text-amber-600 font-medium">Cliente no encontrado.</p>
         )}
       </div>
+      )}
 
       {/* Client info */}
       {dniFound ? (

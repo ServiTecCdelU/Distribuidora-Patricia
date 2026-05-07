@@ -13,7 +13,7 @@ export type UserRole = "admin" | "seller" | null;
 
 export type PaymentType = "cash" | "credit" | "mixed";
 export type PaymentMethod = "efectivo" | "transferencia";
-export type LookupType = "dni" | "cuit";
+export type LookupType = "dni" | "cuit" | "search";
 export type DeliveryMethod = "pickup" | "delivery";
 export type DeliveryAddressType = "saved" | "new";
 export type DiscountType = "percent" | "fixed";
@@ -100,6 +100,7 @@ export interface CartActions {
   setLookupType: (type: LookupType) => void;
   setSelectedClient: (id: string) => void;
   setDniLookup: (dni: string) => void;
+  selectClientFromSearch: (clientId: string) => void;
   setClientName: (v: string) => void;
   setClientEmail: (v: string) => void;
   setClientPhone: (v: string) => void;
@@ -900,6 +901,25 @@ export function useCart(role: UserRole, userEmail?: string) {
     [],
   );
 
+  const selectClientFromSearch = useCallback(
+    (clientId: string) => {
+      const found = clients.find((c) => c.id === clientId);
+      if (!found) return;
+      setSelectedClient(found.id);
+      setClientName(found.name || "");
+      setClientEmail(found.email || "");
+      setClientPhone(found.phone || "");
+      setClientAddress(found.address || "");
+      setClientCuit(found.cuit || "");
+      setClientTaxCategory(found.taxCategory || "consumidor_final");
+      setDniClientId(found.id);
+      setDniFound(true);
+      setDniNotFound(false);
+      setDniLookup(found.dni || found.cuit || "");
+    },
+    [clients],
+  );
+
   const state: CartState = {
     products, clients, sellers, loading,
     cart, cartTotal, cartSubtotal, cartCount, finalTotal, discountAmount,
@@ -916,7 +936,7 @@ export function useCart(role: UserRole, userEmail?: string) {
 
   const actions: CartActions = {
     addToCart, updateQuantity, setQuantityDirect, removeFromCart, setItemDiscount,
-    setLookupType, setSelectedClient, setDniLookup,
+    setLookupType, setSelectedClient, setDniLookup, selectClientFromSearch,
     setClientName, setClientEmail, setClientPhone, setClientAddress,
     setClientDni, setClientCuit, setClientTaxCategory,
     setSelectedSeller,
