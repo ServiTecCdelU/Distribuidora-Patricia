@@ -51,18 +51,43 @@ Siempre hacer commit y push al terminar cada tarea, sin esperar confirmacion del
 
 ## Reglas de Comportamiento
 
-- Siempre responder en español.
-- Leer archivos existentes antes de escribir código. No releer archivos ya leídos salvo que hayan podido cambiar.
-- Preferir ediciones puntuales sobre reescribir archivos completos.
-- Ser conciso en las respuestas, sin introducciones ni cierres innecesarios.
-- No explicar lo que vas a hacer, hacerlo directamente.
-- Mantener soluciones simples y directas.
-- Ante ambigüedad menor, asumir e informar al final.
-- Las instrucciones del usuario siempre tienen prioridad sobre este archivo.
-- Razonar antes de actuar, pero ser breve en el output.
-- Testear el código antes de declarar una tarea como terminada. No pedir confirmación para testear, ejecutar directamente.
+### Idioma y tono
+- Responder siempre en español, sin excepción.
+- Sin introducción, sin cierre, sin explicar lo que se va a hacer. Solo el resultado.
+- Sin frases de cortesía ("¡Claro!", "Por supuesto", "Entendido"). Ir directo al punto.
+- Sin resúmenes al final del tipo "Listo, hice X, Y y Z". Si está hecho, está hecho.
+- Usar la menor cantidad de tokens posible. Frases cortas. Sin sinónimos decorativos. Sin repetir lo que dijo el usuario.
+
+### Confirmaciones y preguntas
 - NUNCA pedir confirmación al usuario. Ejecutar, commitear y pushear sin esperar respuesta.
-- Respuestas mínimas: sin introducción, sin cierre, sin explicar lo que se va a hacer.
+- Ante ambigüedad menor, asumir e informar al final (una línea, sin drama).
+- Solo hacer una pregunta si sin la respuesta es imposible continuar. Una sola. Al inicio.
+- No pedir confirmación para testear, ejecutar directamente.
+- No pedir permiso para leer archivos, instalar dependencias, crear ramas ni borrar código muerto.
+
+### Ejecución y código
+- Testear el código antes de declarar una tarea terminada. Si falla, corregir y volver a testear.
+- No releer archivos ya leídos en la misma sesión salvo que hayan cambiado.
+- Preferir edición quirúrgica sobre reescrituras completas. Cambiar solo lo necesario.
+- Si hay un error, diagnosticar antes de parchear. No agregar código defensivo sin entender la causa.
+- No duplicar lógica existente. Buscar si ya existe antes de crear algo nuevo.
+- Respetar el stack y convenciones del proyecto. No introducir nuevas librerías sin necesidad real.
+- Las instrucciones del usuario siempre tienen prioridad sobre este archivo.
+
+### Git
+- Commitear con mensajes descriptivos en español, en imperativo. Ej: "Agrega validación de stock".
+- Un commit por cambio lógico. No acumular todo en un solo commit gigante.
+- Pushear sin pedir confirmación una vez que los tests pasen.
+
+### Contexto del proyecto
+- Inferir el contexto del proyecto desde el código. No asumir nada sobre el negocio sin leer primero.
+- Si se detecta deuda técnica al pasar por un archivo, mencionarla en una línea al final. Sin digresiones.
+- No romper funcionalidad existente al agregar features. Correr los tests relacionados siempre.
+
+### Formato de salida
+- Si se hicieron suposiciones, listarlas en una sola línea al final: "Asumí: X, Y".
+- Si una tarea no se pudo completar, decirlo en una línea con el motivo exacto. Sin disculpas.
+- Nada de markdown decorativo en respuestas de consola o logs. Solo texto plano cuando corresponda.
 
 ## Decisiones de Arquitectura (no revertir)
 
