@@ -157,6 +157,7 @@ export default function ProductosPage() {
   const [marcaFilter, setMarcaFilter] = useState<MarcaFilter>("all");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
   const [sinTaccFilter, setSinTaccFilter] = useState<SinTaccFilter>("all");
+  const [showDisabled, setShowDisabled] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -557,6 +558,28 @@ export default function ProductosPage() {
     setBulkDeactivateDialogOpen(true);
   };
 
+  const handleBulkEnable = async () => {
+    try {
+      await Promise.all(
+        selectedProducts.map((id) =>
+          productsApi.update(id, { disabled: false } as any)
+        )
+      );
+      await Promise.all(
+        selectedProducts.map((id) => sincronizarHabilitadoEnMayorista(id, true))
+      );
+      setProducts((prev) =>
+        prev.map((p) =>
+          selectedProducts.includes(p.id) ? { ...p, disabled: false } : p
+        )
+      );
+      toast.success(`${selectedProducts.length} productos habilitados`);
+      setSelectedProducts([]);
+    } catch {
+      toast.error("Error al habilitar productos");
+    }
+  };
+
   const confirmBulkDeactivate = async () => {
     try {
       const productsToDisable = products.filter((p) =>
@@ -656,7 +679,9 @@ export default function ProductosPage() {
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      if ((product as any).disabled) return false;
+      const isDisabled = (product as any).disabled;
+      if (isDisabled && !showDisabled) return false;
+      if (!isDisabled && showDisabled) return false;
       const matchesSearch =
         (product.name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (product.category ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -719,6 +744,7 @@ export default function ProductosPage() {
     marcaFilter,
     sinTaccFilter,
     stockFilter,
+    showDisabled,
   ]);
 
   const stats = useMemo(() => {
@@ -745,7 +771,7 @@ export default function ProductosPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, categoryFilter, priceFilter, marcaFilter, stockFilter, sinTaccFilter]);
+  }, [searchQuery, categoryFilter, priceFilter, marcaFilter, stockFilter, sinTaccFilter, showDisabled]);
 
   const paginatedProducts = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -936,6 +962,21 @@ export default function ProductosPage() {
               >
                 <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Valor Inventario</span>
+              </Button>
+
+              <Button
+                variant={showDisabled ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setShowDisabled(!showDisabled)}
+                className="gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3"
+                title={showDisabled ? "Ver habilitados" : "Ver deshabilitados"}
+              >
+                {showDisabled ? (
+                  <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                )}
+                <span className="hidden sm:inline">{showDisabled ? "Habilitados" : "Deshabilitados"}</span>
               </Button>
 
               <Button
@@ -1227,16 +1268,29 @@ export default function ProductosPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={handleBulkDeactivate}
-            >
-              <EyeOff className="h-4 w-4" />
-              <span className="hidden sm:inline">Deshabilitar</span>
-              <span className="sm:hidden">Sacar</span>
-            </Button>
+            {showDisabled ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-green-600 border-green-300 hover:bg-green-50"
+                onClick={handleBulkEnable}
+              >
+                <Eye className="h-4 w-4" />
+                <span className="hidden sm:inline">Habilitar</span>
+                <span className="sm:hidden">Activar</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleBulkDeactivate}
+              >
+                <EyeOff className="h-4 w-4" />
+                <span className="hidden sm:inline">Deshabilitar</span>
+                <span className="sm:hidden">Sacar</span>
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -1261,15 +1315,19 @@ export default function ProductosPage() {
                     No se encontraron productos
                   </h3>
                   <p className="text-muted-foreground text-sm mb-6">
-                    {searchQuery || activeFilterCount > 0
+                    {showDisabled
+                      ? "No hay productos deshabilitados"
+                      : searchQuery || activeFilterCount > 0
                       ? "Prueba ajustando tus filtros"
                       : "Comienza agregando tu primer producto"}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Button onClick={handleCreate} className="gap-2">
-                      <Plus className="h-4 w-4" />
-                      Agregar
-                    </Button>
+                    {!showDisabled && (
+                      <Button onClick={handleCreate} className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Agregar
+                      </Button>
+                    )}
                     {(searchQuery || activeFilterCount > 0) && (
                       <Button variant="outline" onClick={clearFilters}>
                         Limpiar
