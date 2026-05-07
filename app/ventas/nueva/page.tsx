@@ -16,7 +16,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Warehouse, Clock, CheckCircle2 } from "lucide-react";
 import {
   Search,
   Plus,
@@ -87,7 +86,6 @@ function NuevaVentaContent({
   const [searchQuery, setSearchQuery] = useState("");
   const [showDisabled, setShowDisabled] = useState(false);
   const [cartDialogOpen, setCartDialogOpen] = useState(false);
-  const [mayoristaDialogOpen, setMayoristaDialogOpen] = useState(false);
 
   // Abrir carrito automáticamente si viene desde tienda (?openCart=true)
   useEffect(() => {
@@ -117,11 +115,14 @@ function NuevaVentaContent({
 
   const filteredProducts = enabledProducts.length + disabledProducts.length > 0;
 
-  const handleConfirmSale = async (modo: "esperar" | "disponible") => {
-    setMayoristaDialogOpen(false);
+  const handleConfirmSale = async () => {
+    setCartDialogOpen(false);
+    const hayPendiente = state.cart.some(
+      (item) => item.quantity > (item.product.stockLocal ?? 0)
+    );
+    const modo = hayPendiente ? "esperar" : "disponible";
     const result = await actions.processSale(modo);
     if (result === "order") {
-      // Transportistas y "ambos" tienen acceso a pedidos; vendedores puros no
       const canSeePedidos = employeeType === "transportista" || employeeType === "ambos";
       router.push(canSeePedidos ? "/pedidos" : "/ventas");
     }
@@ -338,125 +339,18 @@ function NuevaVentaContent({
               role={cartRole}
               state={state}
               actions={actions}
-              onConfirmSale={() => { setCartDialogOpen(false); setMayoristaDialogOpen(true); }}
+              onConfirmSale={handleConfirmSale}
             />
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de opciones mayorista */}
-      <MayoristaOptionsDialog
-        open={mayoristaDialogOpen}
-        onOpenChange={setMayoristaDialogOpen}
-        cart={state.cart}
-        total={state.finalTotal}
-        formatCurrency={actions.formatCurrency}
-        processing={state.processing}
-        onConfirm={handleConfirmSale}
-      />
     </MainLayout>
   );
 }
 
-// ─── Dialog de opciones mayorista ────────────────────────────────────────────
+// ─── Sub-componentes de productos ─────────────────────────────────────────────
 import type { Product, CartItem } from "@/lib/types";
-
-function MayoristaOptionsDialog({
-  open, onOpenChange, cart, total, formatCurrency, processing, onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  cart: CartItem[];
-  total: number;
-  formatCurrency: (n: number) => string;
-  processing: boolean;
-  onConfirm: (modo: "esperar" | "disponible") => void;
-}) {
-  const hayPendiente = cart.some((item) => {
-    const stockLocal = item.product.stockLocal ?? 0;
-    return item.quantity > stockLocal;
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Warehouse className="h-5 w-5 text-teal-600" />
-            Confirmar venta
-          </DialogTitle>
-          <DialogDescription className="sr-only">Elegí cómo procesar esta venta</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3">
-          {/* Resumen de ítems */}
-          <div className="rounded-xl border divide-y text-sm">
-            {cart.map((item) => {
-              const stockLocal = item.product.stockLocal ?? 0;
-              const local = Math.min(item.quantity, stockLocal);
-              const pendiente = Math.max(0, item.quantity - stockLocal);
-              return (
-                <div key={item.product.id} className="flex items-center justify-between px-3 py-2 gap-2">
-                  <span className="flex-1 truncate font-medium text-xs">{item.product.name}</span>
-                  <div className="flex items-center gap-2 text-xs shrink-0">
-                    <span className="text-emerald-600">local: {local}</span>
-                    {pendiente > 0 && (
-                      <span className="text-amber-600">mayorista: {pendiente}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex justify-between items-center px-1 text-sm font-semibold">
-            <span className="text-muted-foreground">Total</span>
-            <span className="text-lg text-teal-600">{formatCurrency(total)}</span>
-          </div>
-
-          {/* Opciones */}
-          {hayPendiente ? (
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <button
-                onClick={() => onConfirm("esperar")}
-                disabled={processing}
-                className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-amber-300 bg-amber-50/50 hover:bg-amber-50 transition-colors disabled:opacity-50 text-left"
-              >
-                <Clock className="h-6 w-6 text-amber-600" />
-                <div>
-                  <p className="font-semibold text-sm text-amber-800">Esperar todo</p>
-                  <p className="text-xs text-amber-700/70 mt-0.5">Queda pendiente hasta que llegue el stock</p>
-                </div>
-              </button>
-              <button
-                onClick={() => onConfirm("disponible")}
-                disabled={processing}
-                className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-teal-300 bg-teal-50/50 hover:bg-teal-50 transition-colors disabled:opacity-50 text-left"
-              >
-                <CheckCircle2 className="h-6 w-6 text-teal-600" />
-                <div>
-                  <p className="font-semibold text-sm text-teal-800">Vender con lo que hay</p>
-                  <p className="text-xs text-teal-700/70 mt-0.5">Confirma con stock local, el resto se cancela</p>
-                </div>
-              </button>
-            </div>
-          ) : (
-            <div className="pt-1">
-              <button
-                onClick={() => onConfirm("disponible")}
-                disabled={processing}
-                className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl border-2 border-teal-300 bg-teal-50/50 hover:bg-teal-50 transition-colors disabled:opacity-50 font-semibold text-teal-800"
-              >
-                <CheckCircle2 className="h-5 w-5 text-teal-600" />
-                {processing ? "Procesando..." : "Confirmar venta"}
-              </button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ─── Sub-componentes de productos ─────────────────────────────────────────────
 

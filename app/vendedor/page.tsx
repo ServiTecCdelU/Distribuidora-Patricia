@@ -26,9 +26,6 @@ import {
   LogOut,
   Loader2,
   Package,
-  Warehouse,
-  Clock,
-  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -82,7 +79,6 @@ function VendedorDashboard({ userEmail, userName }: { userEmail: string; userNam
 
   const [search, setSearch] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus al montar
@@ -109,8 +105,12 @@ function VendedorDashboard({ userEmail, userName }: { userEmail: string; userNam
     return m;
   }, [state.cart]);
 
-  const handleConfirm = async (modo: "esperar" | "disponible") => {
-    setConfirmOpen(false);
+  const handleConfirm = async () => {
+    setCartOpen(false);
+    const hayPendiente = state.cart.some(
+      (item) => item.quantity > (item.product.stockLocal ?? 0)
+    );
+    const modo = hayPendiente ? "esperar" : "disponible";
     const result = await actions.processSale(modo);
     if (result === "order") router.push("/pedidos");
   };
@@ -348,108 +348,13 @@ function VendedorDashboard({ userEmail, userName }: { userEmail: string; userNam
               role="seller"
               state={state}
               actions={actions}
-              onConfirmSale={() => { setCartOpen(false); setConfirmOpen(true); }}
+              onConfirmSale={handleConfirm}
             />
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog confirmar */}
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        cart={state.cart}
-        total={state.finalTotal}
-        processing={state.processing}
-        onConfirm={handleConfirm}
-      />
     </div>
   );
 }
 
-// ─── Dialog de confirmación ───────────────────────────────────────────────────
-function ConfirmDialog({
-  open, onOpenChange, cart, total, processing, onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  cart: CartItem[];
-  total: number;
-  processing: boolean;
-  onConfirm: (modo: "esperar" | "disponible") => void;
-}) {
-  const hayPendiente = cart.some((item) => item.quantity > (item.product.stockLocal ?? 0));
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Warehouse className="h-5 w-5 text-teal-600" />
-            Confirmar venta
-          </DialogTitle>
-          <DialogDescription className="sr-only">Elegí cómo procesar esta venta</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3">
-          <div className="rounded-xl border divide-y text-sm">
-            {cart.map((item) => {
-              const local = Math.min(item.quantity, item.product.stockLocal ?? 0);
-              const pendiente = Math.max(0, item.quantity - (item.product.stockLocal ?? 0));
-              return (
-                <div key={item.product.id} className="flex items-center justify-between px-3 py-2 gap-2">
-                  <span className="flex-1 truncate font-medium text-xs">{item.product.name}</span>
-                  <div className="flex items-center gap-2 text-xs shrink-0">
-                    <span className="text-emerald-600">local: {local}</span>
-                    {pendiente > 0 && <span className="text-amber-600">mayorista: {pendiente}</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex justify-between items-center px-1 text-sm font-semibold">
-            <span className="text-muted-foreground">Total</span>
-            <span className="text-lg text-teal-600">{formatCurrency(total)}</span>
-          </div>
-
-          {hayPendiente ? (
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <button
-                onClick={() => onConfirm("esperar")}
-                disabled={processing}
-                className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-amber-300 bg-amber-50/50 hover:bg-amber-50 transition-colors disabled:opacity-50"
-              >
-                <Clock className="h-6 w-6 text-amber-600" />
-                <div className="text-center">
-                  <p className="font-semibold text-sm text-amber-800">Esperar todo</p>
-                  <p className="text-xs text-amber-700/70 mt-0.5">Queda pendiente hasta recibir stock</p>
-                </div>
-              </button>
-              <button
-                onClick={() => onConfirm("disponible")}
-                disabled={processing}
-                className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-teal-300 bg-teal-50/50 hover:bg-teal-50 transition-colors disabled:opacity-50"
-              >
-                <CheckCircle2 className="h-6 w-6 text-teal-600" />
-                <div className="text-center">
-                  <p className="font-semibold text-sm text-teal-800">Vender con lo que hay</p>
-                  <p className="text-xs text-teal-700/70 mt-0.5">Confirma con stock local disponible</p>
-                </div>
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => onConfirm("disponible")}
-              disabled={processing}
-              className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl border-2 border-teal-300 bg-teal-50/50 hover:bg-teal-50 transition-colors disabled:opacity-50 font-semibold text-teal-800"
-            >
-              <CheckCircle2 className="h-5 w-5 text-teal-600" />
-              {processing ? "Procesando..." : "Confirmar venta"}
-            </button>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}

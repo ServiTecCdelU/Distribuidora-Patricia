@@ -771,6 +771,27 @@ export function useCart(role: UserRole, userEmail?: string) {
         resetCart();
         return "order";
       } else {
+        // Si hay déficit de stock y modo=esperar: crear pedido en lugar de venta pendiente
+        const hayInsuficiencia = cart.some(item => item.quantity > (item.product.stockLocal ?? 0));
+        if (modo === "esperar" && hayInsuficiencia) {
+          await ordersApi.createOrder({
+            clientId: resolvedClientId,
+            clientName: resolvedClientName || "Mostrador",
+            clientPhone: resolvedClientPhone,
+            sellerId: resolvedSellerId,
+            sellerName: resolvedSellerName,
+            items: cart,
+            address: "Retiro en local",
+            status: "pending",
+            source: "direct_sale",
+            discount: discountValue > 0 ? discountValue : undefined,
+            discountType: discountValue > 0 ? discountType : undefined,
+          });
+          toast.success("Pedido creado — falta stock del mayorista");
+          resetCart();
+          return "order";
+        }
+
         const overpayment =
           paymentType === "cash" && cashAmount > finalTotal
             ? cashAmount - finalTotal
