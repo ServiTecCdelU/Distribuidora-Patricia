@@ -137,7 +137,7 @@ export function StoreFront({
   }, [authLoading, user, router]);
 
   // Role para el carrito (null = público/cliente)
-  const cartRole: UserRole = isPublicStore ? null : (user?.role === "admin" ? "admin" : user?.role === "seller" ? "seller" : null);
+  const cartRole: UserRole = publicMode ? null : (user?.role === "admin" ? "admin" : user?.role === "seller" ? "seller" : null);
   const { state: cartState, actions: cartActions } = useCart(cartRole, user?.email);
 
   // Aliases for cart state used throughout the page
@@ -1554,7 +1554,7 @@ export function StoreFront({
           <DialogContent className="sm:max-w-md bg-card/90 backdrop-blur border border-border/60 shadow-xl">
             <DialogHeader>
               <DialogTitle className="sr-only">
-                {isPublicStore ? "Pedido Recibido" : "Venta Completada"}
+                {publicMode ? "Pedido Recibido" : "Venta Completada"}
               </DialogTitle>
             </DialogHeader>
             <div className="text-center py-2">
@@ -1562,9 +1562,9 @@ export function StoreFront({
                 <CheckCircle className="h-8 w-8 text-success" />
               </div>
               <h2 className="text-xl font-bold text-foreground mb-1">
-                {isPublicStore ? "Pedido Recibido" : "Venta Completada"}
+                {publicMode ? "Pedido Recibido" : "Venta Completada"}
               </h2>
-              {isPublicStore ? (
+              {publicMode ? (
                 <div className="space-y-2">
                   <p className="text-muted-foreground">
                     Tu pedido fue generado correctamente. Te contactaremos para
@@ -1603,7 +1603,7 @@ export function StoreFront({
 
             <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
               <Button className="w-full sm:w-auto" onClick={cartActions.resetCart}>
-                {isPublicStore ? "Seguir Comprando" : "Nueva Venta"}
+                {publicMode ? "Seguir Comprando" : "Nueva Venta"}
               </Button>
             </DialogFooter>
           </DialogContent>

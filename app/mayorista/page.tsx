@@ -44,7 +44,6 @@ import type { MayoristaProducto, MayoristaPrefs } from "@/lib/types";
 import {
   getMayoristaProductos,
   upsertMayoristaProductos,
-  updateMayoristaProducto,
   habilitarProducto,
   deshabilitarProducto,
   getMayoristaPrefs,
@@ -575,7 +574,7 @@ function HabilitarModal({
   onClose: () => void;
   onConfirm: (changes: Partial<MayoristaProducto>) => void;
 }) {
-  const [lote, setLote] = useState(producto.lote ? String(producto.lote) : "");
+  const [lote, setLote] = useState(producto.unidadesPorBulto ? String(producto.unidadesPorBulto) : "");
   const [seDivide, setSeDivide] = useState(
     producto.seDivideEn ? String(producto.seDivideEn) : ""
   );
@@ -601,11 +600,17 @@ function HabilitarModal({
     }
     setSaving(true);
     try {
-      await habilitarProducto(producto, loteNum, divideNum, precioVentaCalc > 0 ? precioVentaCalc : undefined);
+      await habilitarProducto(
+        producto,
+        loteNum,
+        divideNum,
+        precioVentaCalc > 0 ? precioVentaCalc : undefined,
+        !isNaN(gananciaNum) ? gananciaNum : undefined
+      );
       toast.success(`"${producto.nombre}" habilitado — ${porciones} porciones en stock`);
       onConfirm({
         habilitado: true,
-        lote: loteNum,
+        unidadesPorBulto: loteNum,
         seDivideEn: divideNum,
         precioVenta: precioVentaCalc > 0 ? precioVentaCalc : producto.precioVenta,
         gananciaGlobal: !isNaN(gananciaNum) ? gananciaNum : producto.gananciaGlobal,
@@ -630,7 +635,7 @@ function HabilitarModal({
           </DialogDescription>
         </DialogHeader>
 
-        {producto.productoId && (producto.lote || producto.seDivideEn) && (
+        {producto.productoId && (producto.unidadesPorBulto || producto.seDivideEn) && (
           <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             Valores anteriores precargados — modificalos si cambió el lote

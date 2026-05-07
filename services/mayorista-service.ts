@@ -56,6 +56,9 @@ export const invalidateMayoristaCache = () => {
   }
 };
 
+// Mapea un documento de mayorista_productos.
+// Los campos que ahora viven en "productos" (precioVenta, gananciaGlobal, etc.)
+// quedan en 0/undefined hasta que getMayoristaProductos los complete via join.
 function mapDoc(id: string, data: Record<string, unknown>): MayoristaProducto {
   return {
     id,
@@ -65,17 +68,17 @@ function mapDoc(id: string, data: Record<string, unknown>): MayoristaProducto {
     precioUnitarioMayorista: (data.precioUnitarioMayorista as number) ?? 0,
     rubro: (data.rubro as string) ?? "",
     subrubro: (data.subrubro as string) ?? "",
-    unidadesPorBulto: (data.unidadesPorBulto as number) ?? 1,
     categoria: (data.categoria as string) ?? "Sin categoría",
-    precioVenta: (data.precioVenta as number) ?? 0,
-    gananciaGlobal: data.gananciaGlobal as number | undefined,
-    gananciaIndividual: (data.gananciaIndividual as boolean) ?? false,
-    stockLocal: (data.stockLocal as number) ?? 0,
     habilitado: (data.habilitado as boolean) ?? false,
-    lote: data.lote as number | undefined,
-    seDivideEn: data.seDivideEn as number | undefined,
     productoId: data.productoId as string | undefined,
     updatedAt: toDate(data.updatedAt),
+    // Campos desde "productos" — se completan en el join de getMayoristaProductos
+    precioVenta: 0,
+    gananciaGlobal: undefined,
+    gananciaIndividual: false,
+    stockLocal: 0,
+    unidadesPorBulto: undefined,
+    seDivideEn: undefined,
   };
 }
 
@@ -86,23 +89,47 @@ export const getMayoristaProductos = async (forceRefresh = false): Promise<Mayor
       return cached.data;
     }
   }
+
   const snap = await getDocs(collection(firestore, COL));
-  const data = snap.docs
-    .map((d) => mapDoc(d.id, d.data() as Record<string, unknown>))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-  writeCache(data);
-  return data;
+  const data = snap.docs.map((d) => mapDoc(d.id, d.data() as Record<string, unknown>));
+
+  // Join con "productos" para los habilitados — obtiene precioVenta, gananciaGlobal, etc.
+  const habilitados = data.filter((p) => p.habilitado && p.productoId);
+  if (habilitados.length > 0) {
+    const productosSnaps = await Promise.all(
+      habilitados.map((p) => getDoc(doc(firestore, PRODUCTS_COLLECTION, p.productoId!)))
+    );
+    const productosMap = new Map<string, Record<string, unknown>>();
+    productosSnaps.forEach((snap) => {
+      if (snap.exists()) productosMap.set(snap.id, snap.data() as Record<string, unknown>);
+    });
+
+    for (const p of data) {
+      if (!p.productoId) continue;
+      const pd = productosMap.get(p.productoId);
+      if (!pd) continue;
+      p.precioVenta = (pd.precioVenta as number) ?? (pd.price as number) ?? 0;
+      p.gananciaGlobal = pd.gananciaGlobal as number | undefined;
+      p.gananciaIndividual = (pd.gananciaIndividual as boolean) ?? false;
+      p.stockLocal = (pd.stock as number) ?? 0;
+      p.unidadesPorBulto = pd.unidadesPorBulto as number | undefined;
+      p.seDivideEn = pd.seDivideEn as number | undefined;
+    }
+  }
+
+  const sorted = data.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  writeCache(sorted);
+  return sorted;
 };
 
 const BATCH_SIZE = 300;
 const PARALLEL_BATCHES = 2; // 2 x 300 = 600 writes concurrentes, dentro del límite
 
 export const upsertMayoristaProductos = async (
-  productos: Omit<MayoristaProducto, "id" | "updatedAt" | "stockLocal" | "precioVenta" | "gananciaGlobal" | "habilitado" | "lote" | "seDivideEn" | "productoId">[],
+  productos: Omit<MayoristaProducto, "id" | "updatedAt" | "stockLocal" | "precioVenta" | "gananciaGlobal" | "gananciaIndividual" | "habilitado" | "unidadesPorBulto" | "seDivideEn" | "productoId">[],
   onProgress?: (done: number, total: number) => void
 ): Promise<void> => {
   // Pre-lectura para detectar cambios y solo escribir los productos que cambiaron.
-  // Trades reads (50K/día) por writes (20K/día) — mucho más eficiente para importaciones diarias.
   onProgress?.(0, productos.length);
   const snap = await getDocs(collection(firestore, COL));
   const existingMap = new Map<string, Record<string, unknown>>();
@@ -146,22 +173,19 @@ export const upsertMayoristaProductos = async (
           precioUnitarioMayorista: p.precioUnitarioMayorista,
           rubro: p.rubro ?? "",
           subrubro: p.subrubro ?? "",
-          unidadesPorBulto: p.unidadesPorBulto,
           categoria: p.categoria,
           updatedAt: serverTimestamp(),
         },
-        { merge: true } // preserva precioVenta, habilitado, lote, etc.
+        { merge: true } // preserva habilitado, productoId, etc.
       );
     }
     await batch.commit();
     done += chunk.length;
-    // Progreso relativo al total original (no solo los que cambiaron)
     onProgress?.(Math.round((done / toWrite.length) * productos.length), productos.length);
   }
   onProgress?.(productos.length, productos.length);
 
-  // Reconstruir el caché con los datos que ya tenemos en memoria,
-  // aplicando los cambios escritos. Evita una lectura extra de Firestore.
+  // Reconstruir caché aplicando los cambios escritos
   const updatedMap = new Map(existingMap);
   for (const p of toWrite) {
     const id = `mp_${p.codigo.replace(/[^a-zA-Z0-9]/g, "_")}`;
@@ -174,7 +198,6 @@ export const upsertMayoristaProductos = async (
       precioUnitarioMayorista: p.precioUnitarioMayorista,
       rubro: p.rubro ?? "",
       subrubro: p.subrubro ?? "",
-      unidadesPorBulto: p.unidadesPorBulto,
       categoria: p.categoria,
       updatedAt: new Date(),
     });
@@ -185,21 +208,10 @@ export const upsertMayoristaProductos = async (
   writeCache(updatedData);
 };
 
-export const updateMayoristaProducto = async (
-  id: string,
-  updates: Partial<Pick<MayoristaProducto, "categoria" | "precioVenta" | "gananciaGlobal" | "gananciaIndividual" | "stockLocal" | "lote" | "seDivideEn">>
-): Promise<void> => {
-  await updateDoc(doc(firestore, COL, id), {
-    ...updates,
-    updatedAt: serverTimestamp(),
-  });
-};
-
-// Aplica un porcentaje a una lista de productos ya cargados en memoria (sin re-leer Firestore).
-// Usa batches paralelos para máxima velocidad.
+// Aplica un porcentaje a una lista de productos — escribe en "productos", no en mayorista_productos.
 export const applyGananciaToProducts = async (
   porcentaje: number,
-  products: Array<{ id: string; precioUnitarioMayorista: number }>,
+  products: Array<{ id: string; productoId: string; precioUnitarioMayorista: number }>,
   onProgress?: (done: number, total: number) => void
 ): Promise<void> => {
   const chunks: typeof products[] = [];
@@ -213,12 +225,13 @@ export const applyGananciaToProducts = async (
     await Promise.all(
       group.map(async (chunk) => {
         const batch = writeBatch(firestore);
-        chunk.forEach(({ id, precioUnitarioMayorista }) => {
+        chunk.forEach(({ productoId, precioUnitarioMayorista }) => {
           const precioVenta = Math.round(precioUnitarioMayorista * (1 + porcentaje / 100) * 100) / 100;
-          batch.update(doc(firestore, COL, id), {
+          batch.update(doc(firestore, PRODUCTS_COLLECTION, productoId), {
+            price: precioVenta,
             precioVenta,
             gananciaGlobal: porcentaje,
-            updatedAt: serverTimestamp(),
+            gananciaIndividual: false,
           });
         });
         await batch.commit();
@@ -228,7 +241,7 @@ export const applyGananciaToProducts = async (
     );
   }
 
-  // Actualizar caché local con los nuevos precios de venta (sin leer Firestore)
+  // Actualizar caché local con los nuevos precios
   const cached = readCache();
   if (cached) {
     const updateMap = new Map(products.map((p) => [p.id, p.precioUnitarioMayorista]));
@@ -238,70 +251,81 @@ export const applyGananciaToProducts = async (
         ...p,
         precioVenta: Math.round(updateMap.get(p.id)! * (1 + porcentaje / 100) * 100) / 100,
         gananciaGlobal: porcentaje,
+        gananciaIndividual: false,
       };
     });
     writeCache(updated);
   }
 };
 
-// Mantiene compatibilidad (lee de Firestore, útil si no hay productos en memoria)
-export const applyGananciaGlobal = async (porcentaje: number): Promise<void> => {
-  const snap = await getDocs(collection(firestore, COL));
-  const products = snap.docs.map((d) => ({
-    id: d.id,
-    precioUnitarioMayorista: (d.data().precioUnitarioMayorista as number) ?? 0,
-  }));
-  await applyGananciaToProducts(porcentaje, products);
+// Actualiza precio de venta individual en "productos"
+export const updateProductoPrecioVenta = async (
+  productoId: string,
+  precio: number,
+  gananciaIndividual: boolean
+): Promise<void> => {
+  await updateDoc(doc(firestore, PRODUCTS_COLLECTION, productoId), {
+    price: precio,
+    precioVenta: precio,
+    gananciaIndividual,
+  });
 };
 
 // ─── Habilitar / Deshabilitar ─────────────────────────────────────────────────
 
 export const habilitarProducto = async (
   mp: MayoristaProducto,
-  lote: number,
+  unidadesPorBulto: number,
   seDivideEn: number,
-  precioVentaOverride?: number
+  precioVentaOverride?: number,
+  gananciaGlobal?: number
 ): Promise<void> => {
   const precio = precioVentaOverride ?? mp.precioVenta;
 
   let productoId = mp.productoId;
 
   if (productoId) {
-    // Solo actualizar precio y asegurar que esté habilitado — el stock se gestiona aparte
+    // Actualizar producto existente
     await updateDoc(doc(firestore, PRODUCTS_COLLECTION, productoId), {
       price: precio,
+      precioVenta: precio,
+      unidadesPorBulto,
+      seDivideEn,
       disabled: false,
+      ...(gananciaGlobal != null ? { gananciaGlobal } : {}),
     });
   } else {
-    // ID determinístico basado en el código del mayorista, sin loop de lecturas
+    // Crear nuevo producto con ID determinístico
     productoId = `prod_${mp.id}`;
     await setDoc(doc(firestore, PRODUCTS_COLLECTION, productoId), {
       name: mp.nombre,
       description: mp.codigo,
       price: precio,
+      precioVenta: precio,
       stock: 0,
       imageUrl: "",
       category: mp.rubro || mp.categoria || "Sin categoría",
       disabled: false,
+      unidadesPorBulto,
+      seDivideEn,
+      ...(gananciaGlobal != null ? { gananciaGlobal } : {}),
       createdAt: serverTimestamp(),
     });
   }
 
+  // Solo habilitado y productoId se guardan en mayorista_productos
   await updateDoc(doc(firestore, COL, mp.id), {
     habilitado: true,
-    lote,
-    seDivideEn,
     productoId,
-    precioVenta: precio,
     updatedAt: serverTimestamp(),
   });
 
-  // Actualizar caché local para que el refresh no revierta el estado
+  // Actualizar caché local
   const cached = readCache();
   if (cached) {
     const updated = cached.data.map((p) =>
       p.id === mp.id
-        ? { ...p, habilitado: true, lote, seDivideEn, productoId, precioVenta: precio, updatedAt: new Date() }
+        ? { ...p, habilitado: true, unidadesPorBulto, seDivideEn, productoId, precioVenta: precio, updatedAt: new Date() }
         : p
     );
     writeCache(updated);
@@ -314,8 +338,7 @@ export const deshabilitarProducto = async (mp: MayoristaProducto): Promise<void>
     updatedAt: serverTimestamp(),
   });
 
-  // Deshabilitar en la colección productos.
-  // Usar productoId guardado; si no existe, derivar el ID determinístico (prod_<mp.id>).
+  // Deshabilitar en "productos"
   const productoId = mp.productoId ?? `prod_${mp.id}`;
   try {
     await updateDoc(doc(firestore, PRODUCTS_COLLECTION, productoId), {

@@ -24,9 +24,12 @@ export interface Product {
   imageUrl: string;
   category: string;
   createdAt: Date;
-  // Campos mayorista (solo cuando el producto viene de mayorista_productos)
-  stockLocal?: number;
-  unidadesPorBulto?: number;
+  // Campos mayorista (almacenados en productos cuando viene de mayorista_productos)
+  unidadesPorBulto?: number;   // Lote total (unidades que entran)
+  seDivideEn?: number;         // Unidades por porción
+  precioVenta?: number;        // Precio calculado con ganancia
+  gananciaGlobal?: number;     // % de ganancia aplicado
+  gananciaIndividual?: boolean; // true = precio seteado individualmente
   codigo?: string;
 }
 
@@ -204,18 +207,17 @@ export interface MayoristaProducto {
   precioUnitarioMayorista: number;
   rubro?: string;
   subrubro?: string;
-  unidadesPorBulto: number;
   categoria: string;
+  habilitado?: boolean;
+  productoId?: string;
+  updatedAt: Date;
+  // Campos que viven en "productos" — poblados via join en getMayoristaProductos
   precioVenta: number;
   gananciaGlobal?: number;
   gananciaIndividual?: boolean; // true = precio seteado manualmente, saltear en "Aplicar a todos"
   stockLocal: number;
-  // Habilitar en productos
-  habilitado?: boolean;
-  lote?: number;
-  seDivideEn?: number;
-  productoId?: string;
-  updatedAt: Date;
+  unidadesPorBulto?: number;   // Lote total (era "lote"), almacenado en productos
+  seDivideEn?: number;         // Unidades por porción, almacenado en productos
 }
 
 export interface MayoristaPrefs {

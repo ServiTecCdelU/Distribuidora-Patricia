@@ -24,8 +24,8 @@ import type { Product, MayoristaProducto } from "@/lib/types";
 import { formatCurrency, formatCompactNumber } from "@/lib/utils/format";
 import {
   getMayoristaProductos,
-  updateMayoristaProducto,
   applyGananciaToProducts,
+  updateProductoPrecioVenta,
 } from "@/services/mayorista-service";
 import {
   Plus,
@@ -613,15 +613,7 @@ export default function ProductosPage() {
           products.map((p) => (p.id === editingProduct.id ? updated : p)),
         );
 
-        // Si es producto de mayorista y se modificó lote/seDivideEn, sincronizar
-        const extra = productData as any;
-        if (editingProduct.id.startsWith("prod_") && extra.lote && extra.seDivideEn) {
-          const mayoristaId = editingProduct.id.replace("prod_", "");
-          await updateMayoristaProducto(mayoristaId, {
-            lote: extra.lote,
-            seDivideEn: extra.seDivideEn,
-          });
-        }
+        // unidadesPorBulto y seDivideEn ya se guardan directamente en productos vía productsApi.update
       } else {
         const newProduct = await productsApi.create(productData);
         setProducts([...products, newProduct]);
@@ -1720,7 +1712,9 @@ function PreciosVentaHabilitados() {
     try {
       await applyGananciaToProducts(
         porc,
-        necesitan.map((p) => ({ id: p.id, precioUnitarioMayorista: p.precioUnitarioMayorista })),
+        necesitan
+          .filter((p) => !!p.productoId)
+          .map((p) => ({ id: p.id, productoId: p.productoId!, precioUnitarioMayorista: p.precioUnitarioMayorista })),
         (done, total) => setProgressGanancia({ done, total })
       );
       setProductos((prev) =>
@@ -1746,8 +1740,9 @@ function PreciosVentaHabilitados() {
   const guardarPrecio = async (p: MayoristaProducto) => {
     const precio = parseFloat(precioInput.replace(",", "."));
     if (isNaN(precio) || precio < 0) { toast.error("Precio inválido"); return; }
+    if (!p.productoId) { toast.error("Este producto no tiene ID en catálogo"); return; }
     try {
-      await updateMayoristaProducto(p.id, { precioVenta: precio, gananciaIndividual: true });
+      await updateProductoPrecioVenta(p.productoId, precio, true);
       setProductos((prev) => prev.map((x) => x.id === p.id ? { ...x, precioVenta: precio, gananciaIndividual: true } : x));
       setEditingId(null);
       toast.success("Precio individual guardado");

@@ -66,6 +66,12 @@ function mapProduct(docSnap: { id: string; data: () => Record<string, unknown> }
     sinTacc: (data.sinTacc as boolean) ?? false,
     disabled: (data.disabled as boolean) ?? false,
     createdAt: toDate(data.createdAt),
+    // Campos mayorista (presentes cuando el producto fue creado desde mayorista_productos)
+    unidadesPorBulto: data.unidadesPorBulto as number | undefined,
+    seDivideEn: data.seDivideEn as number | undefined,
+    precioVenta: data.precioVenta as number | undefined,
+    gananciaGlobal: data.gananciaGlobal as number | undefined,
+    gananciaIndividual: data.gananciaIndividual as boolean | undefined,
   };
 }
 

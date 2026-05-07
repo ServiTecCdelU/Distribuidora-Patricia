@@ -136,7 +136,7 @@ export function ProductModal({
       });
       setImagePreview(product.imageUrl || null);
       setStockToAdd(0);
-      setLote((product as any).lote ? String((product as any).lote) : "");
+      setLote((product as any).unidadesPorBulto ? String((product as any).unidadesPorBulto) : "");
       setSeDivideEn((product as any).seDivideEn ? String((product as any).seDivideEn) : "");
     } else {
       setFormData({
@@ -202,9 +202,9 @@ export function ProductModal({
         description: formData.description || "",
         imageUrl: formData.imageUrl || "",
         stock: finalStock,
-        // Campos extra para mayorista (se procesan en handleSave del padre)
+        // Campos extra para mayorista — se guardan directamente en productos
         ...(isMayorista && loteNum > 0 && divideNum > 0
-          ? { lote: loteNum, seDivideEn: divideNum }
+          ? { unidadesPorBulto: loteNum, seDivideEn: divideNum }
           : {}),
       } as any);
     } finally {
