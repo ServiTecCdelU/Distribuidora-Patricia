@@ -1517,10 +1517,10 @@ export default function ProductosPage() {
                                 {product.category}
                               </td>
                               <td className="px-3 py-2.5 text-right font-semibold text-teal-600 whitespace-nowrap">
-                                {product.unidadesPorBulto && product.seDivideEn && product.seDivideEn > 1
-                                  ? formatCurrency(Math.round(product.price * product.unidadesPorBulto / product.seDivideEn * 100) / 100)
+                                {product.seDivideEn && product.seDivideEn > 1
+                                  ? formatCurrency(Math.round(product.price * product.seDivideEn * 100) / 100)
                                   : formatCurrency(product.price)}
-                                {product.unidadesPorBulto && product.seDivideEn && product.seDivideEn > 1 && (
+                                {product.seDivideEn && product.seDivideEn > 1 && (
                                   <span className="block text-[10px] font-normal text-muted-foreground">/ lote</span>
                                 )}
                               </td>
@@ -1542,30 +1542,30 @@ export default function ProductosPage() {
                                     <PopoverTrigger asChild>
                                       <button className="inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700 transition-colors">
                                         {product.seDivideEn && product.seDivideEn > 1
-                                          ? Math.round(product.unidadesPorBulto / product.seDivideEn)
-                                          : product.unidadesPorBulto}
+                                          ? `${Math.floor(product.unidadesPorBulto / product.seDivideEn)} lotes`
+                                          : `${product.unidadesPorBulto}u`}
                                         <Eye className="h-3 w-3 text-muted-foreground" />
                                       </button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-48 p-3 text-xs space-y-1.5" side="left">
+                                    <PopoverContent className="w-52 p-3 text-xs space-y-1.5" side="left">
                                       <p className="font-semibold text-foreground mb-2">Detalle de lote</p>
                                       <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Bulto</span>
-                                        <span className="font-medium">1</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Unidades total</span>
+                                        <span className="text-muted-foreground">Unidades por bulto</span>
                                         <span className="font-medium">{product.unidadesPorBulto}</span>
                                       </div>
                                       {product.seDivideEn && product.seDivideEn > 1 && (
                                         <>
                                           <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Se divide en</span>
+                                            <span className="text-muted-foreground">Unidades por lote</span>
                                             <span className="font-medium">{product.seDivideEn}</span>
                                           </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Lotes por bulto</span>
+                                            <span className="font-medium">{Math.floor(product.unidadesPorBulto / product.seDivideEn)}</span>
+                                          </div>
                                           <div className="flex justify-between border-t pt-1.5 mt-1">
-                                            <span className="text-muted-foreground">Unid. venta</span>
-                                            <span className="font-semibold text-teal-600">{Math.round(product.unidadesPorBulto / product.seDivideEn)}</span>
+                                            <span className="text-muted-foreground">Precio por lote</span>
+                                            <span className="font-semibold text-teal-600">{formatCurrency(Math.round(product.price * product.seDivideEn * 100) / 100)}</span>
                                           </div>
                                         </>
                                       )}
