@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ClientModal } from "@/components/clientes/client-modal";
 import { ordersApi, salesApi, clientsApi, paymentsApi, sellersApi } from "@/lib/api";
 import type { Order, OrderStatus, Client, Seller } from "@/lib/types";
-import { Package, Search, Calendar, User, Filter, X, Loader2, Navigation, ClipboardList, Store } from "lucide-react";
+import { Package, Search, Calendar, User, Filter, X, Loader2, Navigation, ClipboardList, Store, ShoppingCart } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VentasMayoristaTab } from "@/components/pedidos/VentasMayoristaTab";
 import { PedidoMayoristaTab } from "@/components/pedidos/PedidoMayoristaTab";
@@ -92,6 +92,7 @@ export default function PedidosPage() {
   const [processingPayment, setProcessingPayment] = useState(false);
 
   const [routeModalOpen, setRouteModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("entregas");
 
   // Selección masiva
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
@@ -759,22 +760,15 @@ export default function PedidosPage() {
 
   return (
     <MainLayout title="Pedidos" description="Seguimiento de pedidos y entregas">
-      <Tabs defaultValue="entregas" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="rounded-xl">
           <TabsTrigger value="entregas" className="rounded-lg gap-1.5">
             <ClipboardList className="h-4 w-4" /> Entregas
-          </TabsTrigger>
-          <TabsTrigger value="ventas" className="rounded-lg gap-1.5">
-            <Package className="h-4 w-4" /> Ventas
           </TabsTrigger>
           <TabsTrigger value="mayorista" className="rounded-lg gap-1.5">
             <Store className="h-4 w-4" /> Pedido al mayorista
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="ventas" className="mt-0">
-          <VentasMayoristaTab />
-        </TabsContent>
 
         <TabsContent value="mayorista" className="mt-0">
           <PedidoMayoristaTab />
@@ -1009,6 +1003,7 @@ export default function PedidosPage() {
         onRemoveTransportista={handleRemoveTransportista}
         sellers={sellers}
         userRole={user?.role}
+        onHacerPedido={() => { closeAllModals(); setActiveTab("mayorista"); }}
       />
 
       <PaymentModal

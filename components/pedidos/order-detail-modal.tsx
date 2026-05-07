@@ -35,6 +35,7 @@ import {
   Send,
   Loader2,
   UserCheck,
+  ShoppingCart,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { statusConfig, statusFlow } from "@/lib/order-constants";
@@ -77,6 +78,7 @@ interface OrderDetailModalProps {
   sellers?: Seller[];
   generatingDoc?: boolean;
   userRole?: string;
+  onHacerPedido?: () => void;
 }
 
 export function OrderDetailModal({
@@ -90,6 +92,7 @@ export function OrderDetailModal({
   onRemoveTransportista,
   sellers = [],
   userRole,
+  onHacerPedido,
 }: OrderDetailModalProps) {
   const router = useRouter();
   const [selectedTransportista, setSelectedTransportista] = useState<string>("");
@@ -435,6 +438,18 @@ export function OrderDetailModal({
               })}
             </div>
           </div>
+
+          {/* Botón hacer pedido mayorista */}
+          {onHacerPedido && (
+            <Button
+              variant="outline"
+              className="w-full gap-2 border-teal-300 text-teal-700 hover:bg-teal-50"
+              onClick={onHacerPedido}
+            >
+              <ShoppingCart className="h-4 w-4" />
+              Hacer pedido al mayorista
+            </Button>
+          )}
 
           {/* Botón avanzar */}
           {nextStatus && (
