@@ -9,6 +9,7 @@ import {
   updateDoc,
   where,
   writeBatch,
+  limit,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import type { MayoristaProducto, MayoristaPrefs } from "@/lib/types";
@@ -259,6 +260,10 @@ export const applyGananciaToProducts = async (
       };
     });
     writeCache(updated);
+    // Notificar a la UI que mayorista/productos se actualizó (para que componentes hagan refresh)
+    if (typeof window !== "undefined") {
+      try { window.dispatchEvent(new CustomEvent("mayorista:updated", { detail: { porcentaje } })); } catch { /* noop */ }
+    }
   }
 };
 
@@ -283,6 +288,9 @@ export const updateProductoPrecioVenta = async (
         : p
     );
     writeCache(updated);
+    if (typeof window !== "undefined") {
+      try { window.dispatchEvent(new CustomEvent("mayorista:updated", { detail: { productoId, precio } })); } catch { /* noop */ }
+    }
   }
 };
 
@@ -295,7 +303,30 @@ export const habilitarProducto = async (
   precioVentaOverride?: number,
   gananciaGlobal?: number
 ): Promise<void> => {
-  const precio = precioVentaOverride ?? mp.precioVenta;
+  // Si no se pasó gananciaGlobal, intentar obtener la ganancia "global" vigente
+  // leyendo un producto que tenga gananciaGlobal registrada (si existe).
+  let finalGanancia: number | undefined = gananciaGlobal;
+  if (finalGanancia == null) {
+    try {
+      const q = query(collection(firestore, PRODUCTS_COLLECTION), where("gananciaGlobal", ">=", 0), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const pd = snap.docs[0].data() as Record<string, unknown>;
+        const g = pd.gananciaGlobal as number | undefined;
+        if (typeof g === "number" && !isNaN(g)) finalGanancia = g;
+      }
+    } catch {
+      // si falla la lectura, simplemente no aplicamos ganancia global
+    }
+  }
+
+  // Calcular precio final: prioridad -> override pasado por UI, sino aplicar ganancia final si existe,
+  // sino usar precio ya presente en mp.precioVenta
+  const precio = precioVentaOverride != null
+    ? precioVentaOverride
+    : finalGanancia != null && mp.precioUnitarioMayorista > 0
+      ? Math.round(mp.precioUnitarioMayorista * (1 + finalGanancia / 100) * 100) / 100
+      : mp.precioVenta;
 
   let productoId = mp.productoId;
 
@@ -307,7 +338,7 @@ export const habilitarProducto = async (
       unidadesPorBulto,
       seDivideEn,
       disabled: false,
-      ...(gananciaGlobal != null ? { gananciaGlobal } : {}),
+      ...(finalGanancia != null ? { gananciaGlobal: finalGanancia } : {}),
     });
   } else {
     // Crear nuevo producto con ID determinístico
@@ -323,7 +354,7 @@ export const habilitarProducto = async (
       disabled: false,
       unidadesPorBulto,
       seDivideEn,
-      ...(gananciaGlobal != null ? { gananciaGlobal } : {}),
+      ...(finalGanancia != null ? { gananciaGlobal: finalGanancia } : {}),
       createdAt: serverTimestamp(),
     });
   }
@@ -340,10 +371,13 @@ export const habilitarProducto = async (
   if (cached) {
     const updated = cached.data.map((p) =>
       p.id === mp.id
-        ? { ...p, habilitado: true, unidadesPorBulto, seDivideEn, productoId, precioVenta: precio, updatedAt: new Date() }
+        ? { ...p, habilitado: true, unidadesPorBulto, seDivideEn, productoId, precioVenta: precio, gananciaGlobal: finalGanancia ?? p.gananciaGlobal, updatedAt: new Date() }
         : p
     );
     writeCache(updated);
+    if (typeof window !== "undefined") {
+      try { window.dispatchEvent(new CustomEvent("mayorista:updated", { detail: { mpId: mp.id, productoId } })); } catch { /* noop */ }
+    }
   }
 };
 
@@ -368,6 +402,9 @@ export const deshabilitarProducto = async (mp: MayoristaProducto): Promise<void>
       p.id === mp.id ? { ...p, habilitado: false, updatedAt: new Date() } : p
     );
     writeCache(updated);
+    if (typeof window !== "undefined") {
+      try { window.dispatchEvent(new CustomEvent("mayorista:updated", { detail: { mpId: mp.id, habilitado: false } })); } catch { /* noop */ }
+    }
   }
 };
 
