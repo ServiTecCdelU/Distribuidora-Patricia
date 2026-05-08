@@ -13,6 +13,7 @@ import {
 import { firestore } from "@/lib/firebase";
 import type { MayoristaProducto, MayoristaPrefs } from "@/lib/types";
 import { toDate } from "@/services/firestore-helpers";
+import { invalidateProductsCache } from "@/services/products-service";
 
 const COL = "mayorista_productos";
 const PRODUCTS_COLLECTION = "productos";
@@ -243,7 +244,8 @@ export const applyGananciaToProducts = async (
     );
   }
 
-  // Actualizar caché local con los nuevos precios
+  // Invalidar caché de productos (catálogo, nueva venta) y actualizar caché mayorista
+  invalidateProductsCache();
   const cached = readCache();
   if (cached) {
     const updateMap = new Map(products.map((p) => [p.id, p.precioUnitarioMayorista]));
@@ -271,7 +273,8 @@ export const updateProductoPrecioVenta = async (
     precioVenta: precio,
     gananciaIndividual,
   });
-  // Actualizar caché de mayorista para reflejar el nuevo precio sin tener que recargar
+  // Invalidar caché de productos (catálogo, nueva venta) y actualizar caché mayorista
+  invalidateProductsCache();
   const cached = readCache();
   if (cached) {
     const updated = cached.data.map((p) =>
