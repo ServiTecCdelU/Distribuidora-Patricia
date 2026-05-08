@@ -1567,21 +1567,21 @@ export default function ProductosPage() {
                                     <PopoverContent className="w-52 p-3 text-xs space-y-1.5" side="left">
                                       <p className="font-semibold text-foreground mb-2">Detalle de lote</p>
                                       <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Unidades por bulto</span>
+                                        <span className="text-muted-foreground">Cantidad de unidades por bulto</span>
                                         <span className="font-medium">{product.unidadesPorBulto}</span>
                                       </div>
                                       {product.seDivideEn && product.seDivideEn > 1 && (
                                         <>
                                           <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Unidades por lote</span>
-                                            <span className="font-medium">{product.seDivideEn}</span>
-                                          </div>
-                                          <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Lotes por bulto</span>
+                                            <span className="text-muted-foreground">mini bultos</span>
                                             <span className="font-medium">{Math.floor(product.unidadesPorBulto / product.seDivideEn)}</span>
                                           </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">cantidad de unidades por mini bulto</span>
+                                            <span className="font-medium">{product.seDivideEn}</span>
+                                          </div>
                                           <div className="flex justify-between border-t pt-1.5 mt-1">
-                                            <span className="text-muted-foreground">Precio por lote</span>
+                                            <span className="text-muted-foreground">Precio de cada mini bulto</span>
                                             <span className="font-semibold text-teal-600">{formatCurrency(Math.round(product.price * product.seDivideEn / product.unidadesPorBulto! * 100) / 100)}</span>
                                           </div>
                                         </>
