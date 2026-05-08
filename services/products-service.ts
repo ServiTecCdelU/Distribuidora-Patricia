@@ -92,26 +92,7 @@ export const getProducts = async (forceRefresh = false): Promise<Product[]> => {
 export const getProductById = async (id: string): Promise<Product | undefined> => {
   const snapshot = await getDoc(doc(firestore, PRODUCTS_COLLECTION, id))
   if (!snapshot.exists()) return undefined
-
-  const data = snapshot.data()
-
-  return {
-    id: snapshot.id,
-    name: data.name,
-    description: data.description,
-    price: data.price,
-    stock: data.stock,
-    imageUrl: data.imageUrl,
-    category: data.category,
-
-    // 👇 TAMBIÉN ACÁ
-    base: data.base ?? 'crema',
-    marca: data.marca ?? 'Sin identificar',
-    sinTacc: data.sinTacc ?? false,
-    disabled: data.disabled ?? false,
-
-    createdAt: toDate(data.createdAt),
-  }
+  return mapProduct(snapshot as any)
 }
 
 
