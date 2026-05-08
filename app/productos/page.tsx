@@ -1749,7 +1749,9 @@ function PreciosVentaHabilitados() {
   const [applyingGlobal, setApplyingGlobal] = useState(false);
   const [progressGanancia, setProgressGanancia] = useState({ done: 0, total: 0 });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingMode, setEditingMode] = useState<"precio" | "ganancia">("precio");
   const [precioInput, setPrecioInput] = useState("");
+  const [gananciaIndInput, setGananciaIndInput] = useState("");
 
   useEffect(() => {
     getMayoristaProductos()
@@ -1824,6 +1826,21 @@ function PreciosVentaHabilitados() {
       toast.success("Precio individual guardado");
     } catch {
       toast.error("Error al guardar el precio");
+    }
+  };
+
+  const guardarGananciaInd = async (p: MayoristaProducto) => {
+    const pct = parseFloat(gananciaIndInput.replace(",", "."));
+    if (isNaN(pct) || pct < 0) { toast.error("Porcentaje inválido"); return; }
+    if (!p.productoId) { toast.error("Este producto no tiene ID en catálogo"); return; }
+    const precio = Math.round(p.precioUnitarioMayorista * (1 + pct / 100) * 100) / 100;
+    try {
+      await updateProductoPrecioVenta(p.productoId, precio, true);
+      setProductos((prev) => prev.map((x) => x.id === p.id ? { ...x, precioVenta: precio, gananciaIndividual: true } : x));
+      setEditingId(null);
+      toast.success("Ganancia individual guardada");
+    } catch {
+      toast.error("Error al guardar la ganancia");
     }
   };
 
@@ -1933,19 +1950,52 @@ function PreciosVentaHabilitados() {
                       {formatCurrency(p.precioUnitarioMayorista)}
                     </td>
                     <td className="px-4 py-3 text-right text-xs text-muted-foreground">
-                      {p.precioVenta > 0 ? (
-                        <span className="flex items-center justify-end gap-1.5">
-                          {`${ganancia.toFixed(1)}%`}
-                          {p.gananciaIndividual && (
-                            <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-medium">
-                              individual
+                      {editingId === p.id && editingMode === "ganancia" ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={gananciaIndInput}
+                            onChange={(e) => setGananciaIndInput(e.target.value)}
+                            className="h-7 text-xs rounded-lg w-20 text-right"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") guardarGananciaInd(p);
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                          />
+                          <span className="text-muted-foreground">%</span>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => guardarGananciaInd(p)}>
+                            <Check className="h-3.5 w-3.5 text-green-600" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingId(null)}>
+                            <X className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          className="flex items-center gap-1.5 justify-end group w-full"
+                          onClick={() => {
+                            setEditingId(p.id);
+                            setEditingMode("ganancia");
+                            setGananciaIndInput(p.precioVenta > 0 ? ganancia.toFixed(1) : "");
+                          }}
+                        >
+                          {p.precioVenta > 0 ? (
+                            <span className="flex items-center gap-1.5">
+                              {`${ganancia.toFixed(1)}%`}
+                              {p.gananciaIndividual && (
+                                <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-medium">ind</span>
+                              )}
                             </span>
-                          )}
-                        </span>
-                      ) : "—"}
+                          ) : <span>—</span>}
+                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {editingId === p.id ? (
+                      {editingId === p.id && editingMode === "precio" ? (
                         <div className="flex items-center justify-end gap-1">
                           <Input
                             type="number"
@@ -1970,7 +2020,11 @@ function PreciosVentaHabilitados() {
                       ) : (
                         <button
                           className="flex items-center gap-1.5 justify-end group w-full"
-                          onClick={() => { setEditingId(p.id); setPrecioInput(p.precioVenta > 0 ? String(p.precioVenta) : ""); }}
+                          onClick={() => {
+                            setEditingId(p.id);
+                            setEditingMode("precio");
+                            setPrecioInput(p.precioVenta > 0 ? String(p.precioVenta) : "");
+                          }}
                         >
                           <span className="font-bold text-teal-600">
                             {p.precioVenta > 0 ? formatCurrency(p.precioVenta) : (

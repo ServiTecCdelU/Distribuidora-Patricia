@@ -271,6 +271,16 @@ export const updateProductoPrecioVenta = async (
     precioVenta: precio,
     gananciaIndividual,
   });
+  // Actualizar caché de mayorista para reflejar el nuevo precio sin tener que recargar
+  const cached = readCache();
+  if (cached) {
+    const updated = cached.data.map((p) =>
+      p.productoId === productoId
+        ? { ...p, precioVenta: precio, gananciaIndividual }
+        : p
+    );
+    writeCache(updated);
+  }
 };
 
 // ─── Habilitar / Deshabilitar ─────────────────────────────────────────────────
