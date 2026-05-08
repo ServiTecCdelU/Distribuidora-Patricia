@@ -226,8 +226,9 @@ export function ProductModal({
   const loteNum = parseInt(lote) || 0;
   const divideNum = parseInt(seDivideEn) || 0;
   const porcionesCalc = loteNum > 0 && divideNum > 0 ? Math.floor(loteNum / divideNum) : null;
-  const isValid =
-    formData.name.trim() && formData.category && formData.price > 0;
+  const isValid = isMayorista && isEditing
+    ? loteNum > 0 && divideNum > 0
+    : formData.name.trim() && formData.category && formData.price > 0;
 
   const displayImage = imagePreview || DEFAULT_IMAGE;
 
@@ -240,450 +241,451 @@ export function ProductModal({
             {isEditing ? "Editar Producto" : "Nuevo Producto"}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            {isEditing
+            {isEditing && isMayorista
+              ? product?.name
+              : isEditing
               ? "Actualizá la información del producto"
               : "Completá la información básica para crear el producto"}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-5">
-          {/* Nombre + Descripción */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium">
-                Nombre <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="Ej: Milanesa de Pollo"
-                className="h-10"
-                autoFocus
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-medium">
-                Descripción
-              </Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="Breve descripción del sabor y características..."
-                rows={2}
-                className="resize-none"
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Clasificación: Categoría + Marca lado a lado en desktop */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Categoría */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Categoría <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(val) => {
-                    if (val === "__new_category__") {
-                      setShowNewCategoryInput(true);
-                    } else {
-                      setFormData({ ...formData, category: val });
-                      setShowNewCategoryInput(false);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Seleccioná..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                    <SelectItem
-                      value="__new_category__"
-                      className="text-primary font-medium"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <Plus className="h-3.5 w-3.5" />
-                        Nueva categoría
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {showNewCategoryInput && (
-                  <div className="flex gap-1.5">
-                    <Input
-                      value={newCategoryInput}
-                      onChange={(e) => setNewCategoryInput(e.target.value)}
-                      placeholder="Nueva categoría..."
-                      className="h-9 text-sm"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addNewCategory();
-                        }
-                        if (e.key === "Escape") {
-                          setShowNewCategoryInput(false);
-                          setNewCategoryInput("");
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-9 px-2.5"
-                      onClick={addNewCategory}
-                      disabled={!newCategoryInput.trim()}
-                    >
-                      OK
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9"
-                      onClick={() => {
-                        setShowNewCategoryInput(false);
-                        setNewCategoryInput("");
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Marca */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Marca</Label>
-                <Select
-                  value={formData.marca}
-                  onValueChange={(val) => {
-                    if (val === "__new_marca__") {
-                      setShowNewMarcaInput(true);
-                    } else {
-                      setFormData({ ...formData, marca: val });
-                      setShowNewMarcaInput(false);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Seleccioná..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {marcas.map((marca) => (
-                      <SelectItem key={marca} value={marca}>
-                        {marca}
-                      </SelectItem>
-                    ))}
-                    <SelectItem
-                      value="__new_marca__"
-                      className="text-primary font-medium"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <Plus className="h-3.5 w-3.5" />
-                        Nueva marca
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {showNewMarcaInput && (
-                  <div className="flex gap-1.5">
-                    <Input
-                      value={newMarcaInput}
-                      onChange={(e) => setNewMarcaInput(e.target.value)}
-                      placeholder="Nueva marca..."
-                      className="h-9 text-sm"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addNewMarca();
-                        }
-                        if (e.key === "Escape") {
-                          setShowNewMarcaInput(false);
-                          setNewMarcaInput("");
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-9 px-2.5"
-                      onClick={addNewMarca}
-                      disabled={!newMarcaInput.trim()}
-                    >
-                      OK
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9"
-                      onClick={() => {
-                        setShowNewMarcaInput(false);
-                        setNewMarcaInput("");
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Sin TACC */}
-            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
-              <div className="space-y-0.5">
-                <Label
-                  htmlFor="sin-tacc"
-                  className="text-sm font-medium cursor-pointer"
-                >
-                  Producto Sin TACC
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Apto para celíacos
-                </p>
-              </div>
-              <Switch
-                id="sin-tacc"
-                checked={formData.sinTacc}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, sinTacc: checked })
-                }
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Precio y Stock */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Precio y Stock</Label>
-            <div className="grid grid-cols-2 gap-4">
-              {/* Precio */}
-              <div className="space-y-2">
-                <Label htmlFor="price" className="text-xs text-muted-foreground">
-                  Precio (ARS)
-                </Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
-                    $
-                  </span>
+          {/* Para productos mayorista en edición: solo el lote */}
+          {isEditing && isMayorista ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="lote-edit" className="text-xs text-muted-foreground">Lote total</Label>
                   <Input
-                    id="price"
+                    id="lote-edit"
                     type="number"
-                    min="0"
-                    step="100"
-                    value={formData.price || ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, price: Number(e.target.value) })
-                    }
-                    className="pl-7 h-10"
-                    placeholder="0"
+                    min="1"
+                    placeholder="Ej: 30"
+                    value={lote}
+                    onChange={(e) => setLote(e.target.value)}
+                    className="h-10"
+                    autoFocus
                   />
+                  <p className="text-xs text-muted-foreground">Unidades que entran</p>
                 </div>
-              </div>
-
-              {/* Stock */}
-              <div className="space-y-2">
-                {isEditing ? (
-                  <>
-                    <Label className="text-xs text-muted-foreground">
-                      Stock actual
-                    </Label>
-                    <div className="h-10 px-3 flex items-center rounded-md border border-border bg-muted/50 text-sm font-medium">
-                      {formData.stock} uds
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <Label htmlFor="stock" className="text-xs text-muted-foreground">
-                      Stock inicial
-                    </Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      min="0"
-                      value={formData.stock || ""}
-                      onChange={(e) =>
-                        setFormData({ ...formData, stock: Number(e.target.value) })
-                      }
-                      className="h-10"
-                      placeholder="0"
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Agregar stock (solo en edición) */}
-            {isEditing && (
-              <div className="p-3 rounded-lg border border-border bg-muted/20 space-y-2">
-                <Label className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                  <PackagePlus className="h-3.5 w-3.5" />
-                  Agregar más stock
-                </Label>
-                <div className="flex items-center gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="divide-edit" className="text-xs text-muted-foreground">Se divide en</Label>
                   <Input
+                    id="divide-edit"
                     type="number"
-                    min="0"
-                    value={stockToAdd || ""}
-                    onChange={(e) =>
-                      setStockToAdd(Math.max(0, Number(e.target.value)))
-                    }
-                    className="h-9 w-28"
-                    placeholder="0"
+                    min="1"
+                    placeholder="Ej: 10"
+                    value={seDivideEn}
+                    onChange={(e) => setSeDivideEn(e.target.value)}
+                    className="h-10"
                   />
-                  {stockToAdd > 0 && (
-                    <span className="text-sm text-muted-foreground">
-                      → Nuevo total:{" "}
-                      <span className="font-semibold text-foreground">
-                        {formData.stock + stockToAdd} uds
-                      </span>
-                    </span>
-                  )}
+                  <p className="text-xs text-muted-foreground">Unidades por porción</p>
                 </div>
               </div>
-            )}
-          </div>
-
-          <Separator />
-
-          {/* Imagen compacta */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Imagen del producto</Label>
-
-            <div className="flex items-center gap-3">
-              {/* Miniatura */}
-              <div className="h-14 w-14 rounded-lg border border-border overflow-hidden flex-shrink-0 bg-muted">
-                <img
-                  src={displayImage}
-                  alt="Preview"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = DEFAULT_IMAGE;
-                  }}
-                />
-              </div>
-
-              {/* Controles */}
-              <div className="flex-1 space-y-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-9 gap-2 text-xs justify-start"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="h-3.5 w-3.5 flex-shrink-0" />
-                  {imagePreview && !imagePreview.startsWith("http")
-                    ? "Cambiar archivo"
-                    : "Subir imagen"}
-                </Button>
-
-                <div className="relative">
-                  <ImageIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    id="imageUrl"
-                    value={
-                      formData.imageUrl && !formData.imageUrl.startsWith("data:")
-                        ? formData.imageUrl
-                        : ""
-                    }
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFormData({ ...formData, imageUrl: val });
-                      setImagePreview(val || null);
-                    }}
-                    placeholder="O pegá una URL..."
-                    className="pl-8 h-9 text-xs"
-                  />
+              {porcionesCalc !== null && (
+                <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 p-3 text-center">
+                  <p className="text-xl font-bold text-teal-600">{porcionesCalc}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    porciones de {parseInt(seDivideEn) || 0} unidades cada una
+                  </p>
                 </div>
-              </div>
-
-              {/* Limpiar */}
-              {imagePreview && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={clearImage}
-                  title="Quitar imagen"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
               )}
             </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="hidden"
-            />
-          </div>
-
-          {/* Lote y seDivideEn — solo para productos de mayorista en edición */}
-          {isEditing && isMayorista && (
+          ) : (
             <>
+              {/* Nombre + Descripción */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-sm font-medium">
+                    Nombre <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    placeholder="Ej: Milanesa de Pollo"
+                    className="h-10"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="text-sm font-medium">
+                    Descripción
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    placeholder="Breve descripción del sabor y características..."
+                    rows={2}
+                    className="resize-none"
+                  />
+                </div>
+              </div>
+
               <Separator />
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Lote mayorista</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="lote-edit" className="text-xs text-muted-foreground">Lote total</Label>
-                    <Input
-                      id="lote-edit"
-                      type="number"
-                      min="1"
-                      placeholder="Ej: 30"
-                      value={lote}
-                      onChange={(e) => setLote(e.target.value)}
-                      className="h-10"
-                    />
-                    <p className="text-xs text-muted-foreground">Unidades que entran</p>
+
+              {/* Clasificación: Categoría + Marca lado a lado en desktop */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Categoría */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      Categoría <span className="text-destructive">*</span>
+                    </Label>
+                    <Select
+                      value={formData.category}
+                      onValueChange={(val) => {
+                        if (val === "__new_category__") {
+                          setShowNewCategoryInput(true);
+                        } else {
+                          setFormData({ ...formData, category: val });
+                          setShowNewCategoryInput(false);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Seleccioná..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                        <SelectItem
+                          value="__new_category__"
+                          className="text-primary font-medium"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Plus className="h-3.5 w-3.5" />
+                            Nueva categoría
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {showNewCategoryInput && (
+                      <div className="flex gap-1.5">
+                        <Input
+                          value={newCategoryInput}
+                          onChange={(e) => setNewCategoryInput(e.target.value)}
+                          placeholder="Nueva categoría..."
+                          className="h-9 text-sm"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addNewCategory();
+                            }
+                            if (e.key === "Escape") {
+                              setShowNewCategoryInput(false);
+                              setNewCategoryInput("");
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-9 px-2.5"
+                          onClick={addNewCategory}
+                          disabled={!newCategoryInput.trim()}
+                        >
+                          OK
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => {
+                            setShowNewCategoryInput(false);
+                            setNewCategoryInput("");
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="divide-edit" className="text-xs text-muted-foreground">Se divide en</Label>
-                    <Input
-                      id="divide-edit"
-                      type="number"
-                      min="1"
-                      placeholder="Ej: 10"
-                      value={seDivideEn}
-                      onChange={(e) => setSeDivideEn(e.target.value)}
-                      className="h-10"
-                    />
-                    <p className="text-xs text-muted-foreground">Unidades por porción</p>
+
+                  {/* Marca */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Marca</Label>
+                    <Select
+                      value={formData.marca}
+                      onValueChange={(val) => {
+                        if (val === "__new_marca__") {
+                          setShowNewMarcaInput(true);
+                        } else {
+                          setFormData({ ...formData, marca: val });
+                          setShowNewMarcaInput(false);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Seleccioná..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {marcas.map((marca) => (
+                          <SelectItem key={marca} value={marca}>
+                            {marca}
+                          </SelectItem>
+                        ))}
+                        <SelectItem
+                          value="__new_marca__"
+                          className="text-primary font-medium"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Plus className="h-3.5 w-3.5" />
+                            Nueva marca
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {showNewMarcaInput && (
+                      <div className="flex gap-1.5">
+                        <Input
+                          value={newMarcaInput}
+                          onChange={(e) => setNewMarcaInput(e.target.value)}
+                          placeholder="Nueva marca..."
+                          className="h-9 text-sm"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addNewMarca();
+                            }
+                            if (e.key === "Escape") {
+                              setShowNewMarcaInput(false);
+                              setNewMarcaInput("");
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-9 px-2.5"
+                          onClick={addNewMarca}
+                          disabled={!newMarcaInput.trim()}
+                        >
+                          OK
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => {
+                            setShowNewMarcaInput(false);
+                            setNewMarcaInput("");
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
-                {porcionesCalc !== null && (
-                  <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 p-3 text-center">
-                    <p className="text-xl font-bold text-teal-600">{porcionesCalc}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      porciones de {parseInt(seDivideEn) || 0} unidades cada una
+
+                {/* Sin TACC */}
+                <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="sin-tacc"
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      Producto Sin TACC
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Apto para celíacos
                     </p>
                   </div>
+                  <Switch
+                    id="sin-tacc"
+                    checked={formData.sinTacc}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, sinTacc: checked })
+                    }
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Precio y Stock */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Precio y Stock</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Precio */}
+                  <div className="space-y-2">
+                    <Label htmlFor="price" className="text-xs text-muted-foreground">
+                      Precio (ARS)
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
+                        $
+                      </span>
+                      <Input
+                        id="price"
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={formData.price || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, price: Number(e.target.value) })
+                        }
+                        className="pl-7 h-10"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Stock */}
+                  <div className="space-y-2">
+                    {isEditing ? (
+                      <>
+                        <Label className="text-xs text-muted-foreground">
+                          Stock actual
+                        </Label>
+                        <div className="h-10 px-3 flex items-center rounded-md border border-border bg-muted/50 text-sm font-medium">
+                          {formData.stock} uds
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Label htmlFor="stock" className="text-xs text-muted-foreground">
+                          Stock inicial
+                        </Label>
+                        <Input
+                          id="stock"
+                          type="number"
+                          min="0"
+                          value={formData.stock || ""}
+                          onChange={(e) =>
+                            setFormData({ ...formData, stock: Number(e.target.value) })
+                          }
+                          className="h-10"
+                          placeholder="0"
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Agregar stock (solo en edición) */}
+                {isEditing && (
+                  <div className="p-3 rounded-lg border border-border bg-muted/20 space-y-2">
+                    <Label className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
+                      <PackagePlus className="h-3.5 w-3.5" />
+                      Agregar más stock
+                    </Label>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        min="0"
+                        value={stockToAdd || ""}
+                        onChange={(e) =>
+                          setStockToAdd(Math.max(0, Number(e.target.value)))
+                        }
+                        className="h-9 w-28"
+                        placeholder="0"
+                      />
+                      {stockToAdd > 0 && (
+                        <span className="text-sm text-muted-foreground">
+                          → Nuevo total:{" "}
+                          <span className="font-semibold text-foreground">
+                            {formData.stock + stockToAdd} uds
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
+              </div>
+
+              <Separator />
+
+              {/* Imagen compacta */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Imagen del producto</Label>
+
+                <div className="flex items-center gap-3">
+                  {/* Miniatura */}
+                  <div className="h-14 w-14 rounded-lg border border-border overflow-hidden flex-shrink-0 bg-muted">
+                    <img
+                      src={displayImage}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_IMAGE;
+                      }}
+                    />
+                  </div>
+
+                  {/* Controles */}
+                  <div className="flex-1 space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-9 gap-2 text-xs justify-start"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-3.5 w-3.5 flex-shrink-0" />
+                      {imagePreview && !imagePreview.startsWith("http")
+                        ? "Cambiar archivo"
+                        : "Subir imagen"}
+                    </Button>
+
+                    <div className="relative">
+                      <ImageIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        id="imageUrl"
+                        value={
+                          formData.imageUrl && !formData.imageUrl.startsWith("data:")
+                            ? formData.imageUrl
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData({ ...formData, imageUrl: val });
+                          setImagePreview(val || null);
+                        }}
+                        placeholder="O pegá una URL..."
+                        className="pl-8 h-9 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Limpiar */}
+                  {imagePreview && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={clearImage}
+                      title="Quitar imagen"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
               </div>
             </>
           )}
